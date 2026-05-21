@@ -2211,6 +2211,16 @@ def faturamento_download_assinados(
 
     return FileResponse(path=zip_tmp.name, filename='faturamento_assinados.zip', media_type='application/zip')
 
+# ── APLIS: debug ───────────────────────────────────────────────────────────────
+
+@app.get("/api/aplis/debug/{cod}")
+def aplis_debug(cod: str):
+    """Debug: retorna o raw `requisicaoStatus` pra vermos a estrutura dos dados."""
+    from ws_aplis.aplis_client import AplisClient
+    client = AplisClient()
+    resultado = client._post("requisicaoStatus", {"codRequisicao": cod})
+    return resultado
+
 # ── APLIS: anexar guia assinada direto (sem depender do sub-app ws_aplis) ───────
 @app.post("/api/aplis/anexar/{cod_requisicao}")
 def aplis_anexar_guia(cod_requisicao: str):
