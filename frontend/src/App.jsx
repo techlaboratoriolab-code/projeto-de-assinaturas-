@@ -263,6 +263,16 @@ function ExecStatusBadge({ status }) {
   return <Badge color="gray">—</Badge>
 }
 
+function fmtExecDuration(startedAt, finishedAt) {
+  if (!startedAt || !finishedAt) return '—'
+  const diffMs = new Date(finishedAt) - new Date(startedAt)
+  if (!Number.isFinite(diffMs) || diffMs < 0) return '—'
+  const diffSec = Math.round(diffMs / 1000)
+  if (diffSec < 60) return `${diffSec}s`
+  const diffMin = Math.round(diffSec / 60)
+  return `${diffMin}min`
+}
+
 function AplisStatusBadge({ status }) {
   if (status === 'assinado') return <Badge color="green">Guia Anexada</Badge>
   if (status === 'pendente') return <Badge color="yellow">Aguardando Assinatura</Badge>
@@ -1325,17 +1335,21 @@ function ExecHistory({ ger, title }) {
               </thead>
               <tbody>
                 {[...records].reverse().map((r, i) => {
-                  const durMin = r.started_at && r.finished_at ? Math.round((new Date(r.finished_at) - new Date(r.started_at)) / 60000) : null
                   const taxa   = r.total_alvo > 0 ? Math.round((r.enviados / r.total_alvo) * 100) : null
                   return (
                     <TRow key={i}>
                       <td style={{ ...TD, color: TX2, fontSize: 11.5, whiteSpace: 'nowrap' }}>{fmtDate(r.started_at) ?? '—'}</td>
                       <td style={{ ...TD, color: TX3, fontSize: 11.5, whiteSpace: 'nowrap' }}>{r.data_inicial && r.data_final ? `${r.data_inicial} → ${r.data_final}` : '—'}</td>
-                      <td style={TD}><ExecStatusBadge status={r.status} /></td>
+                      <td style={TD}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <div><ExecStatusBadge status={r.status} /></div>
+                          {r.last_line && <div title={r.last_line} style={{ color: TX3, fontSize: 10.5, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.last_line}</div>}
+                        </div>
+                      </td>
                       <td style={{ ...TD, color: TX2, fontWeight: 500 }}>{r.total_alvo ?? '—'}</td>
                       <td style={{ ...TD, color: '#60a5fa', fontWeight: 500 }}>{r.enviados ?? '—'}</td>
                       <td style={{ ...TD, color: taxa === null ? TX3 : taxa >= 80 ? '#34d399' : taxa >= 50 ? '#fbbf24' : '#f87171', fontWeight: 500 }}>{taxa !== null ? `${taxa}%` : '—'}</td>
-                      <td style={{ ...TD, color: TX3 }}>{durMin !== null ? `${durMin}min` : '—'}</td>
+                      <td style={{ ...TD, color: TX3 }}>{fmtExecDuration(r.started_at, r.finished_at)}</td>
                     </TRow>
                   )
                 })}

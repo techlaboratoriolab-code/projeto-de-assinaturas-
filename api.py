@@ -314,6 +314,24 @@ def _classify_daily_run_status(return_code: int, lines: list[str] | None = None)
         return "erro"
     return "concluido"
 
+def _extract_daily_run_detail(status: str, lines: list[str] | None = None) -> str:
+    logs = [str(line or "").strip() for line in (lines or []) if str(line or "").strip()]
+    if not logs:
+        return ""
+
+    if status == "sem_dados":
+        for line in reversed(logs):
+            if "Nenhuma requisicao encontrada" in line:
+                return line
+
+    if status == "erro":
+        for line in reversed(logs):
+            upper = line.upper()
+            if upper.startswith("ERRO:") or "[ERRO]" in upper:
+                return line
+
+    return logs[-1]
+
 def _build_gerenciamento_summary(mode: str, rows: list[dict]):
     today = date.today()
     yesterday = today - timedelta(days=1)
@@ -404,6 +422,7 @@ def _record_current_run_if_needed(status: str, logs: list[str] | None = None):
         "com_assinatura": _safe_int(metrics.get("com_assinatura") or 0),
         "sem_assinatura": _safe_int(metrics.get("sem_assinatura") or 0),
         "enviados": _safe_int(metrics.get("enviados") or 0),
+        "last_line": _extract_daily_run_detail(status, logs),
     }
     _append_gerenciamento_record("diario", record)
 
