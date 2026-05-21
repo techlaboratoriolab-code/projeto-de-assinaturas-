@@ -106,6 +106,16 @@ class AplisClient:
         if dat_resp.get("sucesso") == 1:
             print(f"[OK] Guia anexada com sucesso → requisição {dat_resp.get('codRequisicao')}")
         else:
+            # Se falhou, tenta logar novamente e repetir uma única vez (sessão pode ter expirado)
+            print(f"[WARN] Falha na primeira tentativa de anexo ([{dat_resp.get('codErro')}]). Tentando re-login...")
+            self._logado = False
+            if self.login():
+                resultado = self._post("admissaoSalvar", dat)
+                dat_resp = resultado.get("dat", {})
+                if dat_resp.get("sucesso") == 1:
+                    print(f"[OK] Guia anexada com sucesso após re-login")
+                    return dat_resp
+
             print(f"[ERR] Falha ao anexar guia: [{dat_resp.get('codErro')}] {dat_resp.get('msgErro')}")
 
         return dat_resp
