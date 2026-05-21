@@ -209,8 +209,11 @@ def _run_daily_analysis_inline(data_ini: str, data_fim: str, env_overrides: dict
 
         sys.argv = [str(SCRIPT), "--data-inicial", data_ini, "--data-final", data_fim]
         with contextlib.redirect_stdout(writer), contextlib.redirect_stderr(writer):
-            module = importlib.import_module("analisar_assinaturas_v3_vertexai")
-            module = importlib.reload(module)
+            module = sys.modules.get("analisar_assinaturas_v3_vertexai")
+            if module is None:
+                module = importlib.import_module("analisar_assinaturas_v3_vertexai")
+            else:
+                module = importlib.reload(module)
             result = module.main()
             return_code = int(result) if isinstance(result, int) else 0
     except SystemExit as exc:

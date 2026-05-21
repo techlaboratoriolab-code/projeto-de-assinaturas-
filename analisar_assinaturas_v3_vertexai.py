@@ -251,16 +251,43 @@ VERTEX_MAX_RETRIES = int(os.getenv('VERTEX_MAX_RETRIES', '4'))
 VERTEX_RETRY_BASE_SEC = float(os.getenv('VERTEX_RETRY_BASE_SEC', '2'))
 VERTEX_SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 
-try:
-    cred_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-    if not cred_path or not os.path.exists(cred_path):
-        raise FileNotFoundError(f"Credencial nao encontrada: {cred_path}")
+def _load_vertex_credentials():
+    raw_json = (
+        os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
+        or os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+        or ''
+    ).strip()
+    raw_b64 = (
+        os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON_BASE64')
+        or os.getenv('GOOGLE_APPLICATION_CREDENTIALS_BASE64')
+        or ''
+    ).strip()
+    cred_path = (os.getenv('GOOGLE_APPLICATION_CREDENTIALS') or '').strip()
 
-    print("[INFO] Inicializando Vertex AI (REST - sem grpc)...")
-    VERTEX_CREDENTIALS = service_account.Credentials.from_service_account_file(
-        cred_path,
-        scopes=VERTEX_SCOPES
+    if raw_json:
+        info = json.loads(raw_json)
+        return service_account.Credentials.from_service_account_info(info, scopes=VERTEX_SCOPES)
+
+    if raw_b64:
+        decoded = base64.b64decode(raw_b64).decode('utf-8')
+        info = json.loads(decoded)
+        return service_account.Credentials.from_service_account_info(info, scopes=VERTEX_SCOPES)
+
+    if cred_path:
+        if cred_path.lstrip().startswith('{'):
+            info = json.loads(cred_path)
+            return service_account.Credentials.from_service_account_info(info, scopes=VERTEX_SCOPES)
+        if os.path.exists(cred_path):
+            return service_account.Credentials.from_service_account_file(cred_path, scopes=VERTEX_SCOPES)
+
+    raise FileNotFoundError(
+        "Credencial Google nao encontrada. Configure GOOGLE_SERVICE_ACCOUNT_JSON, "
+        "GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 ou um caminho valido em GOOGLE_APPLICATION_CREDENTIALS."
     )
+
+try:
+    print("[INFO] Inicializando Vertex AI (REST - sem grpc)...")
+    VERTEX_CREDENTIALS = _load_vertex_credentials()
     VERTEX_CREDENTIALS.refresh(GoogleAuthRequest())
     VERTEX_DISPONIVEL = True
     print("[OK] Vertex AI REST configurado!")
