@@ -991,9 +991,19 @@ function AbaFaturamento({ running, logs, totalLines, runContext, executionSnapsh
     setAnexandoReq(req)
     try {
       const d = await chamarAnexa(req)
-      if (!d.sucesso) setError(d.erro || 'Falha ao anexar')
+      if (d.sucesso) {
+        alert('✅ Guia anexada com sucesso no APLIS!')
+      } else {
+        const msg = d.erro || 'Erro desconhecido'
+        setError(`Falha ao anexar: ${msg}`)
+        alert(`❌ Falha ao anexar no APLIS:\n${msg}`)
+      }
       refA()
-    } catch { setError('Erro ao conectar ao WS APLIS') }
+    } catch (e) {
+      const errStr = e.toString()
+      setError(`Erro ao conectar ao WS APLIS: ${errStr}`)
+      alert(`💥 Erro de rede/conexão:\n${errStr}`)
+    }
     setAnexandoReq('')
   }, [refA])
 
