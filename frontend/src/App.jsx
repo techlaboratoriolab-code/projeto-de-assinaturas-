@@ -1460,8 +1460,12 @@ export default function App() {
     { id: 'analise',    label: 'Análise' },
     { id: 'documentos', label: 'Documentos Autentique' },
     { id: 'whatsapp',   label: 'WhatsApp Mensagens' },
-    { id: 'faturamento',label: 'Faturamento ★' },
   ]
+
+  const MOSTRAR_FATURAMENTO = false
+  if (MOSTRAR_FATURAMENTO) {
+    TABS.push({ id: 'faturamento', label: 'Faturamento ★' })
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: BG, display: 'flex', flexDirection: 'column', filter: modoClaro ? 'invert(1) hue-rotate(180deg)' : 'none' }}>
