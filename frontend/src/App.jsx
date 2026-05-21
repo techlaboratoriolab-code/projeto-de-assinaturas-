@@ -1314,7 +1314,7 @@ export default function App() {
   const [aba, setAba]           = useState(() => { try { return localStorage.getItem('aba_ativa') || 'analise' } catch { return 'analise' } })
   const [dataInicial, setDataInicial] = useState(formatDateLocal(new Date()))
   const [dataFinal,   setDataFinal]   = useState(formatDateLocal(new Date()))
-  const [modoTeste,   setModoTeste]   = useState(true)
+  const [modoTeste,   setModoTeste]   = useState(false)
   const [tarefaAplis, setTarefaAplis] = useState(false)
   const [running,     setRunning]     = useState(false)
   const [logs,        setLogs]        = useState([])

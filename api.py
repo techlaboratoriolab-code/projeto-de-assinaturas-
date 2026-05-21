@@ -144,7 +144,7 @@ def _load_config() -> dict:
             return json.loads(CONFIG_F.read_text(encoding="utf-8"))
         except Exception:
             pass
-    return {"modo_teste": True, "criar_tarefa_aplis": False}
+    return {"modo_teste": False, "criar_tarefa_aplis": False}
 
 def _save_config(cfg: dict):
     CONFIG_F.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -1100,7 +1100,7 @@ async def dashboard_stream():
                 payload = {
                     "status": {
                         "running": _is_process_running(),
-                        "modo_teste": cfg.get("modo_teste", True),
+                        "modo_teste": cfg.get("modo_teste", False),
                         "criar_tarefa_aplis": cfg.get("criar_tarefa_aplis", False),
                         "log_lines": len(_log_buffer),
                     },
