@@ -1,0 +1,367 @@
+pages=18
+
+=== PAGE 1 ===
+
+Lacuna Sistemas Ltda.
+Av. Santos Dumont, 5753, sala 1607 Torre Office, Fortaleza-CE
+Tel.: (85) 99695 9459
+API de Integração
+1 18
+API de Integração apLIS
+Este documento tem como objetivo descrever a API de integração do sistema apLIS.
+Essa API deverá ser utilizada para o cadastro de dados e obtenção de resultados de exames.
+A leitura desse documento é indicada à área de Tecnologia da Informação ou ao setor responsável
+pelo desenvolvimento e utilização da integração.
+Histórico de Alterações
+Data Descrição Responsável
+04/06/2018 Versão Inicial Eric Moitinho
+27/09/2018 Versão 2
+- recebimento das imagens do pedido
+- cancelamento de requisição recém admitida
+- recebimento de exames anteriores
+Eric Moitinho
+05/11/2018 Alterações na versão 2
+- inclusão dos campos para recebimento dos
+dados clínicos, do paciente, médico
+solicitante, convênio, local de origem e fonte
+pagadora no comando admissaoSalvar
+- recebimento dos dados clínicos
+Eric Moitinho
+15/06/2021 Inclusão do método requisicaoLaudo Eric Moitinho
+01/09/2022 Inclusão do método requisicaoListar Eric Moitinho
+01/02/2023 Inclusão de pesquisa pelo número da guia Eric Moitinho
+12/05/2023 Inclusão de índice
+Inclusão do setor e justificativa no método
+requisicaoStatus
+Eric Moitinho
+13/07/2023 Detalhamento retorno requisicaoListar Eric Moitinho
+02/08/2023 Adicionado a opção para envio do campo
+cpfAusente, no comando pacienteSalvar, para
+justificar a ausência de CPF no json.
+André Emílio
+12/09/2023 Inclusão de filtro por CPF do paciente e ID do
+responsável no método requisicaoListar
+Eric Moitinho
+30/07/2024 Inclusão de filtro por data de alteração no
+método requisicaoListar
+Eric Moitinho
+20/08/2024 Inclusão de campos para recebimento dos
+códigos de identificação externos
+Eric Moitinho
+
+=== PAGE 2 ===
+
+Lacuna Sistemas Ltda.
+Av. Santos Dumont, 5753, sala 1607 Torre Office, Fortaleza-CE
+Tel.: (85) 99695 9459
+API de Integração
+2 18
+Sumário
+Definições 3
+Informações Gerais 3
+Comandos Disponíveis 4
+1 – Admissão (comando admissaoSalvar) 4
+2 – Cadastro de Pacientes (comando pacienteSalvar) 6
+3 – Cadastro de Médicos (comando medicoSalvar) 7
+4 – Cadastro de Instituições (comando instituicaoSalvar) 8
+5 – Cadastro de Convênios (comando convenioSalvar) 9
+6 – Consulta do Status da Requisição (comando requisicaoStatus) 10
+7 – Resultado da Requisição (comando requisicaoResultado) 11
+8 – Laudo da Requisição (comando requisicaoLaudo) 13
+9 – Listagem de Requisições (comando requisicaoListar) 14
+10 – Cancelamento de Requisição (comando requisicaoCancelar) 15
+11 – Envio de Exames Anteriores (comando exameAnteriorSalvar) 16
+12 – Cadastro de Dados Clínicos (comando dadosClinicosSalvar) 17
+Definições
+API é o acrônimo de Application Programming Interface ou, em português, Interface de
+Programação de Aplicativos.
+Informações Gerais
+A API está localizada no endereço https://demo.aplis.inf.br/api/integracao.php
+A troca das informações se dá através do envio e recebimento de conteúdos JSON.
+O conteúdo enviado à API, assim como o retorno, possuirá a seguinte estrutura:
+{
+ver: numero_da_versao,
+cmd: nome_do_comando,
+dat: dados (ver comandos suportados)
+}
+
+
+=== PAGE 4 ===
+
+Lacuna Sistemas Ltda.
+Av. Santos Dumont, 5753, sala 1607 Torre Office, Fortaleza-CE
+Tel.: (85) 99695 9459
+API de Integração
+4 18
+Comandos Disponíveis
+A seguir, os comandos suportados pela API.
+● Os campos com asterisco “*” são de preenchimento obrigatório.
+● Campos data são expressos no formato “AAAA-MM-DD”.
+● Campos hora são expressos no formato “HH:MM:SS”, no padrão 24H.
+● Campos data/hora são expressos no formato “AAAA-MM-DD HH:MM:SS”
+● Campos numéricos não utilizar separador de milhar e utilizar ponto “.” para separação de
+decimais.
+1 – Admissão (comando admissaoSalvar)
+Efetua a gravação (inclusão ou alteração) de uma requisição, como na tela da admissão do apLIS.
+Dados:
+Campo Tipo Descrição
+codRequisicao Texto Código de identificação da requisição.
+Se vazio, uma requisição será criada e um código será gerado.
+Se preenchido, uma requisição será criada com o código fornecido.
+Caso já exista o código, a requisição existente será atualizada.
+idLaboratorio* Numérico Código de identificação do laboratório
+idUnidade* Numérico Código de identificação da unidade de recebimento do material
+idUnidadeExt Texto Código de identificação externo da unidade (conforme de/para)
+idPaciente* Numérico Código de identificação do paciente
+idPacienteExt Texto Código de identificação externo do paciente (no cliente)
+dtaColeta Data Data de coleta do material
+idConvenio* Numérico Código de identificação do convênio
+idConvenioExt Texto Código de identificação externo do convênio (conforme de/para)
+idPlano Numérico Código de identificação do plano/modalidade do convênio do
+paciente
+idPlanoExt Texto Código de identificação externo do plano/modalidade do convênio
+(conforme de/para)
+numGuia Texto, 50 Número da guia do convênio
+idLocalOrigem* Numérico Código de identificação do local de origem
+idLocalOrigemExt Texto Código de identificação externo do local de origem (conforme
+de/para)
+idLocalSetor Numérico Código de identificação do setor do local de origem
+numExterno Texto, 512 Número de identificação externo do exame, no local de origem
+idFontePagadora* Numérico Código de identificação da fonte pagadora
+idFontePagadoraExt Texto Código de identificação externo da fonte pagadora(conforme
+de/para)
+idMedico* Numérico Código de identificação do médico solicitante
+idCBO Numérico Código CBO do médico solicitante
+idMedicoPart Numérico Código de identificação do médico participante
+idExame* Numérico Código de identificação do exame principal solicitado
+idExameExt Texto Código de identificação externo do exame principal solicitado
+(conforme de/para)
+examesConvenio* Array
+Numérico
+Lista de códigos de identificação dos exames a serem cobrados da
+fonte pagadora
+testesPatClinica Array
+Numérico
+Lista dos códigos dos testes de patologia clínica que serão realizados
+dadosClinicos Texto, 3000 Dados clínicos do exame
+
+=== PAGE 6 ===
+
+Lacuna Sistemas Ltda.
+Av. Santos Dumont, 5753, sala 1607 Torre Office, Fortaleza-CE
+Tel.: (85) 99695 9459
+API de Integração
+6 18
+2 – Cadastro de Pacientes (comando pacienteSalvar)
+Efetua a gravação (inclusão ou alteração) dos dados de um paciente.
+Dados:
+Campo Tipo Descrição
+idPaciente Numérico Código de identificação do paciente
+idPacienteExt Texto Código de identificação externo do paciente (no cliente)
+nome* Texto, 255 Nome do paciente
+dtaNasc Data Data de nascimento
+sexo Texto, 1 F ou M
+nomeMae Texto, 255 Nome da mãe
+rg Texto, 15 RG do paciente
+rgOrgao Texto, 10 Órgão emissor do RG
+rgUF Texto, 2 Sigla do estado onde o RG foi emitido
+cpf Texto, 15 CPF do paciente
+cpfAusente Numérico. 1 Opções: 1 - Esqueceu documento 2 - Estrangeiro 3 - Não possui
+idConvenio Numérico Código de identificação do convênio
+matConvenio Texto, 30 Código de matrícula/nº carteirinha do paciente no convênio
+validade Data Validade da carteirinha
+cep Numérico, 8 CEP do paciente
+logradouro Texto, 255 Logradouro (Rua, Av, etc) do endereço
+numEndereco Texto, 20 Número do logradouro
+comEndereco Texto, 255 Complemento do endereço
+bairro Texto, 255 Bairro do endereço
+cidade Texto, 255 Cidade do endereço
+uf Texto, 2 UF da cidade
+telFixo Texto, 20 Telefone fixo
+telCelular Texto, 20 Telefone celular
+email Texto, 255 E-mail
+Retorno:
+Campo Tipo Descrição
+sucesso Numérico, 1 Retornará 1 em caso de sucesso e os demais campos virão
+preenchidos.
+Em caso de erro, retornará 0 e os campos codErro e msgErro.
+idPaciente Numérico Código de identificação do paciente
+
+=== PAGE 9 ===
+
+Lacuna Sistemas Ltda.
+Av. Santos Dumont, 5753, sala 1607 Torre Office, Fortaleza-CE
+Tel.: (85) 99695 9459
+API de Integração
+9 18
+5 – Cadastro de Convênios (comando convenioSalvar)
+Efetua a gravação (inclusão ou alteração) dos dados de um convênio.
+Dados:
+Campo Tipo Descrição
+idConvenio Numérico Código de identificação do convênio
+idConvenioExt Texto Código de identificação externo do convênio (conforme de/para)
+inativo* Numérico, 1 Indica se o convênio está inativo
+nome* Texto, 255 Nome do convênio
+Retorno:
+Campo Tipo Descrição
+sucesso Numérico, 1 Retornará 1 em caso de sucesso e os demais campos virão
+preenchidos.
+Em caso de erro, retornará 0 e os campos codErro e msgErro.
+idConvenio Numérico Código de identificação do convênio
+
+=== PAGE 10 ===
+
+Lacuna Sistemas Ltda.
+Av. Santos Dumont, 5753, sala 1607 Torre Office, Fortaleza-CE
+Tel.: (85) 99695 9459
+API de Integração
+10 18
+6 – Consulta do Status da Requisição (comando requisicaoStatus)
+Efetua a consulta do status da requisição.
+Dados:
+Campo Tipo Descrição
+codRequisicao* Texto Código de identificação da requisição.
+Retorno:
+Campo Tipo Descrição
+sucesso Numérico, 1 Retornará 1 em caso de sucesso e os demais campos virão
+preenchidos.
+Em caso de erro, retornará 0 e os campos codErro e msgErro.
+codRequisicao Numérico, 13 Código de identificação da requisição.
+dtaAdmissao Data/Hora Data e hora em que a requisição foi admitida no sistema
+dtaPrevista Data Data prevista de finalização da requisição
+historico JSON
+id Numérico Código de identificação do status da requisição
+descricao Texto, 255 Descrição do status
+setor Texto, 255 Setor responsável
+descricaoCliente Texto, 255 Descrição do status para exibir ao cliente
+justificativa Tetxo, 255 Justificativa em caso de status fora do fluxo
+data Data/Hora Data e hora em que entrou no status
+login Texto, 100 Login do usuário que alterou o status
+
+=== PAGE 14 ===
+
+Lacuna Sistemas Ltda.
+Av. Santos Dumont, 5753, sala 1607 Torre Office, Fortaleza-CE
+Tel.: (85) 99695 9459
+API de Integração
+14 18
+9 – Listagem de Requisições (comando requisicaoListar)
+Realiza pesquisa paginada das requisições do laboratório.
+Os dados de entrada diferem de acordo com o tipo de usuário autenticado:
+Usuários externos
+Dados:
+Campo Tipo Descrição
+pesquisa Texto Texto de pesquisa da requisição (Cód. Requisição, núm. Externo,
+nome/cpf do paciente ou nome do médico).
+periodoIni* Data Data de solicitação inicial
+periodoFim* Data Data de solicitação final
+idExame Numérico Código de identificação do exame principal
+idEvento Numérico Código do status da requisição
+numGuia Texto Número da guia da operadora
+ordenar Texto Campo para ordenação dos resultados
+pagina Numérico Número da página
+tamanho Numérico Quantidade de registros a serem retornados por página
+Retorno:
+Campo Tipo Descrição
+sucesso Numérico, 1 Retornará 1 em caso de sucesso e os demais campos virão
+preenchidos.
+Em caso de erro, retornará 0 e os campos codErro e msgErro.
+qtdPaginas Numérico Quantidade total de páginas da pesquisa
+registros Texto Quantidade total de registros da pesquisa
+lista JSON array Array contendo os registros encontrados
+IdRequisicao Numérico ID interno da requisição, no apLIS
+IdLaudo Numérico ID interno do laudo importado, no apLIS
+CodRequisicao Texto Código de identificação da requisição
+DtaSolicitacao Data/hora Data da admissão da requisição no sistema
+DtaPrevista Data Data prevista de entrega da requisição
+DtaFinalizacao Data/hora Data de finalização da requisição
+NomPaciente Texto Nome do paciente
+NomMedico Texto Nome do médico solicitante
+NomFantasia Texto Nome do local de origem
+NomExame Texto Nome do exame principal solicitado
+StatusExame Numérico 0 - em andamento; 1 - concluído; 2 - cancelado
+Registro Texto Número de identificação externo do exame, no local de origem
+DtaJustifica Data/hora Data da justificativa de alteração do prazo
+DesJustifica Texto Justificativa da alteração do prazo
+Tipo1 Numérico Controle interno
+Tipo2 Numérico Controle interno
+Status Texto Descrição do status da requisição
+Visualizado Numérico, 1 Indicador se o laudo visualizado anteriormente. 0-não; 1-sim
+AgPagto Numérico, 1 Indicador se requisição aguardando pagamento. 0-não; 1-sim
+
+=== PAGE 15 ===
+
+Lacuna Sistemas Ltda.
+Av. Santos Dumont, 5753, sala 1607 Torre Office, Fortaleza-CE
+Tel.: (85) 99695 9459
+API de Integração
+15 18
+Usuários internos
+Dados:
+Campo Tipo Descrição
+tipoData* Numérico, 1 1 - data de solicitação; 2 - data de finalização; 3 - data de atualização
+periodoIni* Data Data inicial
+periodoFim* Data Data final
+codRequisicao Texto Código de identificação da requisição.
+numGuia Texto Número da guia do convênio ou número externo da requisição
+idPaciente Numérico Código de identificação do paciente
+nomPaciente Texto Nome ou CPF do paciente
+idMedico Numérico Código de identificação do médico solicitante
+idUnidade Numérico Código de identificação da unidade
+idLaboratorio Numérico Código de identificação do laboratório
+idFontePagadora Numérico Código de identificação do fonte pagadora
+idLocalOrigem Numérico Código de identificação do local de origem
+idConvenio Numérico Código de identificação do convênio
+idExame Numérico Código de identificação do exame principal
+idEvento Numérico Código do status da requisição
+idResponsavel Numérico Código de identificação do patologista responsável
+ordenar Texto Campo para ordenação dos resultados
+pagina Numérico Número da página
+tamanho Numérico Quantidade de registros a serem retornados por página
+Retorno:
+Campo Tipo Descrição
+sucesso Numérico, 1 Retornará 1 em caso de sucesso e os demais campos virão
+preenchidos.
+Em caso de erro, retornará 0 e os campos codErro e msgErro.
+qtdPaginas Numérico Quantidade total de páginas da pesquisa
+registros Texto Quantidade total de registros da pesquisa
+lista JSON array Array contendo os registros encontrados
+IdRequisicao Numérico ID interno da requisição, no apLIS
+CodRequisicao Texto Código de identificação da requisição
+DtaSolicitacao Data/hora Data da admissão da requisição no sistema
+DtaFinalizacao Data/hora Data de finalização da requisição
+DtaPrevista Data Data prevista de entrega da requisição
+NumExterno Texto Número de identificação externo do exame, no local de origem
+CodPaciente Numérico Código de identificação do paciente
+CPF Texto, 15 CPF do paciente
+NomPaciente Texto Nome do paciente
+NomExame Texto Nome do exame principal solicitado
+DesEvento Texto Descrição do status da requisição
+StatusExame Numérico 0 - em andamento; 1 - concluído; 2 - cancelado
+Ord Numérico Controle interno
+CodMedico Numérico Código de identificação do médico
+CRM Texto CRM do médico
+CRMUF Texto UF do médico
+CodPrioridade Numérico 0-normal; 1-VIP; 2-urgente
+
+=== PAGE 17 ===
+
+Lacuna Sistemas Ltda.
+Av. Santos Dumont, 5753, sala 1607 Torre Office, Fortaleza-CE
+Tel.: (85) 99695 9459
+API de Integração
+17 18
+11 – Envio de Exames Anteriores (comando exameAnteriorSalvar)
+Efetua a gravação de resultados de exames anteriores de um paciente.
+Dados:
+Campo Tipo Descrição
+numExterno* Texto, 512 Número de identificação externo do exame, no local de origem
+idPaciente* Numérico Código de identificação do paciente
+idPacienteExt Texto Código de identificação externo do paciente (no cliente)
+dtaRealizacao* Data Data de realização do exame
+exame* Texto, 512 Nome/descrição do exame principal realizado
+resultado* Texto Texto contendo o resultado do exame, nos formatos RTF ou HTML
+Retorno:
+Campo Tipo Descrição
+sucesso Numérico, 1 Retornará 1 em caso de sucesso.
+Em caso de erro, retornará 0 e os campos codErro e msgErro.

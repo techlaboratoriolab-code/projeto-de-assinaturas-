@@ -2303,8 +2303,99 @@ def aplis_anexar_guia(cod_requisicao: str):
             }
         
         print(f"[APLIS-ANEXAR] Dados obtidos: {json.dumps(status_dat, default=str)[:300]}")
+        pdf_b64 = _b64.b64encode(pdf_bytes).decode("utf-8")
 
-        def _limpar_escalar(valor):
+        def _build_admissao_payload_db(cod_requisicao: str):
+            try:
+                import mysql.connector
+
+                conn = mysql.connector.connect(
+                    host=os.getenv("DB_HOST", "localhost"),
+                    port=int(os.getenv("DB_PORT", "3306")),
+                    user=os.getenv("DB_USER", "root"),
+                    password=os.getenv("DB_PASSWORD"),
+                    database=os.getenv("DB_NAME"),
+                )
+                cur = conn.cursor(dictionary=True)
+                cur.execute(
+                    """
+                    SELECT
+                        IdRequisicao, IdLaboratorio, IdUnidade, CodPaciente,
+                        IdConvenio, IdLocalOrigem, IdFontePagadora,
+                        CodMedico, CodExame, NumGuiaConvenio,
+                        SenhaAutorizacao, DtaColeta
+                    FROM requisicao
+                    WHERE CodRequisicao = %s
+                    LIMIT 1
+                    """,
+                    (cod_requisicao,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    cur.close()
+                    conn.close()
+                    return None
+
+                testes_pat = []
+                if row.get("IdRequisicao") is not None:
+                    cur.execute(
+                        "SELECT IdTeste FROM requisicaocaptura WHERE IdRequisicao = %s",
+                        (row["IdRequisicao"],),
+                    )
+                    testes_pat = [
+                        int(r["IdTeste"])
+                        for r in cur.fetchall()
+                        if r.get("IdTeste") is not None
+                    ]
+
+                cur.close()
+                conn.close()
+
+                if row.get("CodExame") is None:
+                    return None
+
+                dat = {
+                    "codRequisicao": cod_requisicao,
+                    "idLaboratorio": int(row.get("IdLaboratorio") or APLIS_ID_LABORATORIO),
+                    "idUnidade": int(row["IdUnidade"]),
+                    "idPaciente": int(row["CodPaciente"]),
+                    "idConvenio": int(row["IdConvenio"]),
+                    "idLocalOrigem": int(row["IdLocalOrigem"]),
+                    "idFontePagadora": int(row["IdFontePagadora"]),
+                    "idMedico": int(row["CodMedico"]),
+                    "idExame": int(row["CodExame"]),
+                    "examesConvenio": [int(row["CodExame"])],
+                    "imagens": [
+                        {
+                            "tipo": 5,
+                            "extensao": "PDF",
+                            "arquivo": pdf_b64,
+                        }
+                    ],
+                }
+
+                if row.get("NumGuiaConvenio"):
+                    dat["numGuia"] = str(row["NumGuiaConvenio"])
+                if row.get("SenhaAutorizacao"):
+                    dat["senha"] = str(row["SenhaAutorizacao"])
+                if row.get("DtaColeta"):
+                    dat["dataColeta"] = row["DtaColeta"].strftime("%Y-%m-%d")
+                if testes_pat:
+                    dat["testesPatClinica"] = sorted(set(testes_pat))
+
+                return dat
+            except Exception as e:
+                print(f"[APLIS-ANEXAR] Aviso: não foi possível montar payload via DB local: {e}")
+                return None
+
+        admissao_db = _build_admissao_payload_db(cod)
+        if admissao_db:
+            print("[APLIS-ANEXAR] Usando payload construído via DB local (requisicao/requisicaocaptura).")
+            admissao_dat = admissao_db
+        else:
+            print("[APLIS-ANEXAR] Sem dados suficientes no DB local. Tentando fallback por requisicaoStatus.")
+
+            def _limpar_escalar(valor):
             if valor is None:
                 return None
             if isinstance(valor, (dict, list, tuple, set)):
@@ -2316,104 +2407,122 @@ def aplis_anexar_guia(cod_requisicao: str):
                 return v
             return valor
 
-        fontes = [status_dat]
-        for chave in ("requisicao", "admissao", "dados"):
-            bloco = status_dat.get(chave)
-            if isinstance(bloco, dict):
-                fontes.append(bloco)
+            def _norm_key(chave):
+            return ''.join(ch for ch in str(chave or '').lower() if ch.isalnum())
 
-        def _pick(*chaves):
-            for f in fontes:
-                for c in chaves:
-                    if c in f:
-                        v = _limpar_escalar(f.get(c))
-                        if v is not None:
-                            return v
+            def _iter_dicts(obj):
+            if isinstance(obj, dict):
+                yield obj
+                for v in obj.values():
+                    yield from _iter_dicts(v)
+            elif isinstance(obj, list):
+                for item in obj:
+                    yield from _iter_dicts(item)
+
+            all_dicts = list(_iter_dicts(status_dat))
+
+            def _pick(*chaves):
+            chaves_norm = {_norm_key(c) for c in chaves}
+            for d in all_dicts:
+                for k, v in d.items():
+                    if _norm_key(k) in chaves_norm:
+                        vv = _limpar_escalar(v)
+                        if vv is not None:
+                            return vv
             return None
 
-        # Monta o payload completo com os dados existentes + a nova imagem.
-        # Se faltarem campos obrigatórios, fazemos fallback para payload mínimo.
-        pdf_b64 = _b64.b64encode(pdf_bytes).decode("utf-8")
-        imagens_existentes = []
-        for f in fontes:
-            imgs = f.get("imagens")
-            if isinstance(imgs, list):
-                imagens_existentes = imgs
-                break
+            def _pick_list(*chaves):
+            chaves_norm = {_norm_key(c) for c in chaves}
+            for d in all_dicts:
+                for k, v in d.items():
+                    if _norm_key(k) in chaves_norm and isinstance(v, list):
+                        return v
+            return []
 
-        exames = None
-        for f in fontes:
-            exs = f.get("exames")
-            if isinstance(exs, list):
-                exames = exs
-                break
+            # Monta payload de fallback usando o que houver no requisicaoStatus.
+            imagens_existentes = _pick_list("imagens", "listaImagens", "imagensRequisicao")
+            exames = _pick_list("exames", "listaExames", "itensExame", "itens")
 
-        exames_sanitizados = []
-        if isinstance(exames, list):
-            for ex in exames:
-                if not isinstance(ex, dict):
-                    continue
-                ex_limpo = {}
-                for k, v in ex.items():
-                    vv = _limpar_escalar(v)
-                    if vv is not None:
-                        ex_limpo[k] = vv
-                if ex_limpo:
-                    exames_sanitizados.append(ex_limpo)
+            exames_sanitizados = []
+            if isinstance(exames, list):
+                for ex in exames:
+                    if not isinstance(ex, dict):
+                        continue
+                    ex_limpo = {}
+                    for k, v in ex.items():
+                        vv = _limpar_escalar(v)
+                        if vv is not None:
+                            ex_limpo[k] = vv
+                    if ex_limpo:
+                        exames_sanitizados.append(ex_limpo)
 
-        admissao_dat = {
-            "codRequisicao": cod,
-            "idLaboratorio": APLIS_ID_LABORATORIO,
-            "idUnidade": _pick("idUnidade", "IdUnidade"),
-            "idMedico": _pick("idMedico", "IdMedico"),
-            "idConvenio": _pick("idConvenio", "IdConvenio"),
-            "idLocalOrigem": _pick("idLocalOrigem", "IdLocalOrigem"),
-            "idPrestadorOrigem": _pick("idPrestadorOrigem", "IdPrestadorOrigem"),
-            "idFontePagadora": _pick("idFontePagadora", "IdFontePagadora"),
-            "idTabelaPreco": _pick("idTabelaPreco", "IdTabelaPreco"),
-            "idCobranca": _pick("idCobranca", "IdCobranca"),
-            "idPaciente": _pick("idPaciente", "IdPaciente"),
-            "idExame": _pick("idExame", "IdExame"),
-            "idOrcamento": _pick("idOrcamento", "IdOrcamento"),
-            "idCobrancaConvenio": _pick("idCobrancaConvenio", "IdCobrancaConvenio"),
-            "idCobrancaConvenio2": _pick("idCobrancaConvenio2", "IdCobrancaConvenio2"),
-            "numGuia": _pick("numGuia", "NumGuia"),
-            "senha": _pick("senha", "Senha"),
-            "senha2": _pick("senha2", "Senha2"),
-            "parcial": _pick("parcial", "Parcial"),
-            "tipoAtendimento": _pick("tipoAtendimento", "TipoAtendimento"),
-            "acomodacao": _pick("acomodacao", "Acomodacao"),
-            "dataColeta": _pick("dataColeta", "DataColeta"),
-            "dataColeta2": _pick("dataColeta2", "DataColeta2"),
-            "exames": exames_sanitizados,
-            "imagens": imagens_existentes + [
-                {
-                    "tipo": 5,
-                    "extensao": "PDF",
-                    "arquivo": pdf_b64,
-                }
-            ],
-        }
+            id_exame_extraido = _pick("idExame", "IdExame", "codExame", "CodExame", "idExameTipo", "CodExameTipo")
 
-        # Remove campos vazios para nao sobreescrever com null
-        admissao_dat = {k: v for k, v in admissao_dat.items() if v is not None and v != '' and v != []}
+            if not id_exame_extraido and exames_sanitizados:
+                ex0 = exames_sanitizados[0]
+                id_exame_extraido = (
+                    _limpar_escalar(ex0.get("idExame"))
+                    or _limpar_escalar(ex0.get("IdExame"))
+                    or _limpar_escalar(ex0.get("codExame"))
+                    or _limpar_escalar(ex0.get("CodExame"))
+                    or _limpar_escalar(ex0.get("idExameTipo"))
+                    or _limpar_escalar(ex0.get("CodExameTipo"))
+                )
 
-        campos_criticos = [
-            "idUnidade", "idPaciente", "idConvenio", "idLocalOrigem",
-            "idFontePagadora", "idMedico", "idExame", "idCobrancaConvenio"
-        ]
-        faltantes = [c for c in campos_criticos if not admissao_dat.get(c)]
-
-        if faltantes:
-            print(
-                f"[APLIS-ANEXAR] Campos críticos ausentes em requisicaoStatus ({', '.join(faltantes)}). "
-                "Usando payload mínimo para anexar somente imagem."
-            )
             admissao_dat = {
                 "codRequisicao": cod,
                 "idLaboratorio": APLIS_ID_LABORATORIO,
-                "imagens": admissao_dat["imagens"],
+                "idUnidade": _pick("idUnidade", "IdUnidade"),
+                "idMedico": _pick("idMedico", "IdMedico"),
+                "idConvenio": _pick("idConvenio", "IdConvenio"),
+                "idLocalOrigem": _pick("idLocalOrigem", "IdLocalOrigem"),
+                "idPrestadorOrigem": _pick("idPrestadorOrigem", "IdPrestadorOrigem"),
+                "idFontePagadora": _pick("idFontePagadora", "IdFontePagadora"),
+                "idTabelaPreco": _pick("idTabelaPreco", "IdTabelaPreco"),
+                "idCobranca": _pick("idCobranca", "IdCobranca"),
+                "idPaciente": _pick("idPaciente", "IdPaciente"),
+                "idExame": id_exame_extraido,
+                "idOrcamento": _pick("idOrcamento", "IdOrcamento"),
+                "numGuia": _pick("numGuia", "NumGuia"),
+                "senha": _pick("senha", "Senha"),
+                "senha2": _pick("senha2", "Senha2"),
+                "parcial": _pick("parcial", "Parcial"),
+                "tipoAtendimento": _pick("tipoAtendimento", "TipoAtendimento"),
+                "acomodacao": _pick("acomodacao", "Acomodacao"),
+                "dataColeta": _pick("dataColeta", "DataColeta"),
+                "dataColeta2": _pick("dataColeta2", "DataColeta2"),
+                "exames": exames_sanitizados,
+                "imagens": imagens_existentes + [
+                    {
+                        "tipo": 5,
+                        "extensao": "PDF",
+                        "arquivo": pdf_b64,
+                    }
+                ],
             }
+
+            if admissao_dat.get("idExame"):
+                admissao_dat["examesConvenio"] = [admissao_dat["idExame"]]
+
+            # Remove campos vazios para nao sobreescrever com null
+            admissao_dat = {k: v for k, v in admissao_dat.items() if v is not None and v != '' and v != []}
+
+            campos_criticos = [
+                "idUnidade", "idPaciente", "idConvenio", "idLocalOrigem",
+                "idFontePagadora", "idMedico", "idExame", "examesConvenio"
+            ]
+            faltantes = [c for c in campos_criticos if not admissao_dat.get(c)]
+
+            if faltantes:
+                print(
+                    f"[APLIS-ANEXAR] Campos críticos ausentes em requisicaoStatus ({', '.join(faltantes)}). "
+                    "Usando payload mínimo para anexar somente imagem."
+                )
+                admissao_dat = {
+                    "codRequisicao": cod,
+                    "idLaboratorio": APLIS_ID_LABORATORIO,
+                    "imagens": admissao_dat["imagens"],
+                }
 
         print(f"[APLIS-ANEXAR] Reenviando requisição {cod} com imagem anexada...")
         resultado = client._post("admissaoSalvar", admissao_dat)
@@ -2421,8 +2530,8 @@ def aplis_anexar_guia(cod_requisicao: str):
 
         if dat_resp.get("sucesso") != 1:
             msg_erro = str(dat_resp.get("msgErro") or "")
-            if "SQLSTATE[42000]" in msg_erro or "FIND_IN_SET(" in msg_erro:
-                print("[APLIS-ANEXAR] Erro SQL no payload completo. Tentando fallback com payload mínimo...")
+            if "SQLSTATE[42000]" in msg_erro or "FIND_IN_SET(" in msg_erro or "Selecione" in msg_erro:
+                print("[APLIS-ANEXAR] Erro no payload atual. Tentando fallback com payload mínimo...")
                 admissao_minima = {
                     "codRequisicao": cod,
                     "idLaboratorio": APLIS_ID_LABORATORIO,
