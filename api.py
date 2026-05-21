@@ -8,6 +8,7 @@ Execute com:
     Acesse: http://localhost:8001
 """
 import os
+import sys
 import json
 import csv
 import io
@@ -36,7 +37,7 @@ from pydantic import BaseModel
 
 BASE_DIR   = Path(__file__).parent
 SCRIPT     = BASE_DIR / "analisar_assinaturas_v3_vertexai.py"
-PYTHON     = BASE_DIR / ".venv" / "Scripts" / "python.exe"
+PYTHON     = sys.executable if os.getenv("VERCEL") else (BASE_DIR / ".venv" / "Scripts" / "python.exe" if os.name == "nt" else "python3")
 CONFIG_F   = BASE_DIR / "config.json"
 RELATORIOS_DIR = BASE_DIR / "relatorios"
 IMAGENS_DIR = Path(os.getenv("DIRETORIO_IMAGENS", str(BASE_DIR / "IMAGENS AWS")))
