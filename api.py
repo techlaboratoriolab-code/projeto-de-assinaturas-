@@ -2303,36 +2303,89 @@ def aplis_anexar_guia(cod_requisicao: str):
             }
         
         print(f"[APLIS-ANEXAR] Dados obtidos: {json.dumps(status_dat, default=str)[:300]}")
-        
-        # Monta o payload completo com os dados existentes + a nova imagem
+
+        def _limpar_escalar(valor):
+            if valor is None:
+                return None
+            if isinstance(valor, (dict, list, tuple, set)):
+                return None
+            if isinstance(valor, str):
+                v = valor.strip()
+                if not v or v.lower() in ("null", "none", "undefined"):
+                    return None
+                return v
+            return valor
+
+        fontes = [status_dat]
+        for chave in ("requisicao", "admissao", "dados"):
+            bloco = status_dat.get(chave)
+            if isinstance(bloco, dict):
+                fontes.append(bloco)
+
+        def _pick(*chaves):
+            for f in fontes:
+                for c in chaves:
+                    if c in f:
+                        v = _limpar_escalar(f.get(c))
+                        if v is not None:
+                            return v
+            return None
+
+        # Monta o payload completo com os dados existentes + a nova imagem.
+        # Se faltarem campos obrigatórios, fazemos fallback para payload mínimo.
         pdf_b64 = _b64.b64encode(pdf_bytes).decode("utf-8")
-        imagens_existentes = status_dat.get("imagens", []) or []
-        
+        imagens_existentes = []
+        for f in fontes:
+            imgs = f.get("imagens")
+            if isinstance(imgs, list):
+                imagens_existentes = imgs
+                break
+
+        exames = None
+        for f in fontes:
+            exs = f.get("exames")
+            if isinstance(exs, list):
+                exames = exs
+                break
+
+        exames_sanitizados = []
+        if isinstance(exames, list):
+            for ex in exames:
+                if not isinstance(ex, dict):
+                    continue
+                ex_limpo = {}
+                for k, v in ex.items():
+                    vv = _limpar_escalar(v)
+                    if vv is not None:
+                        ex_limpo[k] = vv
+                if ex_limpo:
+                    exames_sanitizados.append(ex_limpo)
+
         admissao_dat = {
             "codRequisicao": cod,
             "idLaboratorio": APLIS_ID_LABORATORIO,
-            "idUnidade": status_dat.get("idUnidade"),
-            "idMedico": status_dat.get("idMedico"),
-            "idConvenio": status_dat.get("idConvenio"),
-            "idLocalOrigem": status_dat.get("idLocalOrigem"),
-            "idPrestadorOrigem": status_dat.get("idPrestadorOrigem"),
-            "idFontePagadora": status_dat.get("idFontePagadora"),
-            "idTabelaPreco": status_dat.get("idTabelaPreco"),
-            "idCobranca": status_dat.get("idCobranca"),
-            "idPaciente": status_dat.get("idPaciente"),
-            "idExame": status_dat.get("idExame"),
-            "idOrcamento": status_dat.get("idOrcamento"),
-            "idCobrancaConvenio": status_dat.get("idCobrancaConvenio"),
-            "idCobrancaConvenio2": status_dat.get("idCobrancaConvenio2"),
-            "numGuia": status_dat.get("numGuia"),
-            "senha": status_dat.get("senha"),
-            "senha2": status_dat.get("senha2"),
-            "parcial": status_dat.get("parcial"),
-            "tipoAtendimento": status_dat.get("tipoAtendimento"),
-            "acomodacao": status_dat.get("acomodacao"),
-            "dataColeta": status_dat.get("dataColeta"),
-            "dataColeta2": status_dat.get("dataColeta2"),
-            "exames": status_dat.get("exames"),
+            "idUnidade": _pick("idUnidade", "IdUnidade"),
+            "idMedico": _pick("idMedico", "IdMedico"),
+            "idConvenio": _pick("idConvenio", "IdConvenio"),
+            "idLocalOrigem": _pick("idLocalOrigem", "IdLocalOrigem"),
+            "idPrestadorOrigem": _pick("idPrestadorOrigem", "IdPrestadorOrigem"),
+            "idFontePagadora": _pick("idFontePagadora", "IdFontePagadora"),
+            "idTabelaPreco": _pick("idTabelaPreco", "IdTabelaPreco"),
+            "idCobranca": _pick("idCobranca", "IdCobranca"),
+            "idPaciente": _pick("idPaciente", "IdPaciente"),
+            "idExame": _pick("idExame", "IdExame"),
+            "idOrcamento": _pick("idOrcamento", "IdOrcamento"),
+            "idCobrancaConvenio": _pick("idCobrancaConvenio", "IdCobrancaConvenio"),
+            "idCobrancaConvenio2": _pick("idCobrancaConvenio2", "IdCobrancaConvenio2"),
+            "numGuia": _pick("numGuia", "NumGuia"),
+            "senha": _pick("senha", "Senha"),
+            "senha2": _pick("senha2", "Senha2"),
+            "parcial": _pick("parcial", "Parcial"),
+            "tipoAtendimento": _pick("tipoAtendimento", "TipoAtendimento"),
+            "acomodacao": _pick("acomodacao", "Acomodacao"),
+            "dataColeta": _pick("dataColeta", "DataColeta"),
+            "dataColeta2": _pick("dataColeta2", "DataColeta2"),
+            "exames": exames_sanitizados,
             "imagens": imagens_existentes + [
                 {
                     "tipo": 5,
@@ -2341,13 +2394,48 @@ def aplis_anexar_guia(cod_requisicao: str):
                 }
             ],
         }
-        
+
         # Remove campos vazios para nao sobreescrever com null
         admissao_dat = {k: v for k, v in admissao_dat.items() if v is not None and v != '' and v != []}
-        
+
+        campos_criticos = [
+            "idUnidade", "idPaciente", "idConvenio", "idLocalOrigem",
+            "idFontePagadora", "idMedico", "idExame", "idCobrancaConvenio"
+        ]
+        faltantes = [c for c in campos_criticos if not admissao_dat.get(c)]
+
+        if faltantes:
+            print(
+                f"[APLIS-ANEXAR] Campos críticos ausentes em requisicaoStatus ({', '.join(faltantes)}). "
+                "Usando payload mínimo para anexar somente imagem."
+            )
+            admissao_dat = {
+                "codRequisicao": cod,
+                "idLaboratorio": APLIS_ID_LABORATORIO,
+                "imagens": admissao_dat["imagens"],
+            }
+
         print(f"[APLIS-ANEXAR] Reenviando requisição {cod} com imagem anexada...")
         resultado = client._post("admissaoSalvar", admissao_dat)
         dat_resp = resultado.get("dat", {})
+
+        if dat_resp.get("sucesso") != 1:
+            msg_erro = str(dat_resp.get("msgErro") or "")
+            if "SQLSTATE[42000]" in msg_erro or "FIND_IN_SET(" in msg_erro:
+                print("[APLIS-ANEXAR] Erro SQL no payload completo. Tentando fallback com payload mínimo...")
+                admissao_minima = {
+                    "codRequisicao": cod,
+                    "idLaboratorio": APLIS_ID_LABORATORIO,
+                    "imagens": [
+                        {
+                            "tipo": 5,
+                            "extensao": "PDF",
+                            "arquivo": pdf_b64,
+                        }
+                    ],
+                }
+                resultado = client._post("admissaoSalvar", admissao_minima)
+                dat_resp = resultado.get("dat", {})
         
         if dat_resp.get("sucesso") == 1:
             print(f"[APLIS-ANEXAR] ✅ Sucesso! Requisição {cod} anexada.")
