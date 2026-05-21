@@ -17,9 +17,9 @@ APLIS_USER = os.getenv("APLIS_USER", "")
 APLIS_PASS = os.getenv("APLIS_PASS") or os.getenv("APLIS_PASSWORD") or ""
 APLIS_ID_LABORATORIO = int(os.getenv("APLIS_ID_LABORATORIO", "1"))
 
-# Tipo de imagem para GUIA ASSINADA no seu ambiente APLIS: 16.
-# Mantido fixo para evitar anexar como "documento" (5) ou "imagem do pedido" (1).
-APLIS_TIPO_IMAGEM_GUIA = 16
+# Tipo de imagem para GUIA ASSINADA no seu ambiente APLIS: 15.
+# Mantido fixo para evitar anexar como "documento" (5) ou "guia autorizada" (16).
+APLIS_TIPO_IMAGEM_GUIA = 15
 
 # ==================== AUTENTIQUE ====================
 AUTENTIQUE_API_URL = "https://api.autentique.com.br/v2"
