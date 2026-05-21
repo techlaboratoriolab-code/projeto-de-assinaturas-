@@ -990,19 +990,26 @@ function AbaFaturamento({ running, logs, totalLines, runContext, executionSnapsh
   const anexarAplis = useCallback(async (req) => {
     setAnexandoReq(req)
     try {
-      const d = await chamarAnexa(req)
+      console.log('Iniciando anexo APLIS para:', req);
+      const resp = await fetch(`${WS_APLIS_API}/api/requisicoes/${encodeURIComponent(req)}/atualizar-assinatura`, { 
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+      });
+      
+      const d = await resp.json();
+      console.log('Resposta do servidor:', d);
+
       if (d.sucesso) {
-        alert('✅ Guia anexada com sucesso no APLIS!')
+        alert('✅ Guia anexada com sucesso no APLIS!');
       } else {
-        const msg = d.erro || 'Erro desconhecido'
-        setError(`Falha ao anexar: ${msg}`)
-        alert(`❌ Falha ao anexar no APLIS:\n${msg}`)
+        const msg = d.erro || d.msgErro || 'Erro desconhecido';
+        const detalhe = d.detalhe ? `\n\nDetalhe técnico: ${d.detalhe}` : '';
+        alert(`❌ Falha ao anexar no APLIS:\n${msg}${detalhe}`);
       }
       refA()
     } catch (e) {
-      const errStr = e.toString()
-      setError(`Erro ao conectar ao WS APLIS: ${errStr}`)
-      alert(`💥 Erro de rede/conexão:\n${errStr}`)
+      console.error('Erro na chamada:', e);
+      alert(`💥 Erro de conexão com o servidor:\n${e.message}`);
     }
     setAnexandoReq('')
   }, [refA])
