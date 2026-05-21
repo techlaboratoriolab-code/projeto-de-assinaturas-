@@ -2345,9 +2345,12 @@ def aplis_anexar_guia(cod_requisicao: str):
         else:
             erro = f"[{dat_resp.get('codErro')}] {dat_resp.get('msgErro')}"
             print(f"[APLIS-ANEXAR] ❌ {erro}")
-            return {"sucesso": False, "erro": f"APLIS rejeitou: {erro}", "detalhe": str(dat_resp),
-                    "debug_status": {k: str(v)[:100] for k, v in status_dat.items()},
-                    "debug_payload": {k: str(v)[:100] for k, v in admissao_dat.items()}}
+            debug = json.dumps({
+                "status_dat": {k: str(v)[:120] for k, v in status_dat.items()},
+                "payload_enviado": {k: str(v)[:120] for k, v in admissao_dat.items()}
+            }, ensure_ascii=False, default=str)
+            return {"sucesso": False, "erro": f"APLIS rejeitou: {erro}",
+                    "detalhe": f"Debug:\n{debug}"}
     except Exception as e:
         return {"sucesso": False, "erro": f"Exceção ao anexar no APLIS: {str(e)}"}
 
