@@ -10,6 +10,9 @@ Execute com:
 import os
 import sys
 import json
+import importlib
+import contextlib
+import traceback
 from ws_aplis.webhook_server import app as ws_app
 import csv
 import io
@@ -144,6 +147,96 @@ _run_state = {
     "recorded": False,
 }
 _REQ13_RE = re.compile(r"(?<!\d)(\d{13})(?!\d)")
+
+class _InlineProcessHandle:
+    def __init__(self):
+        self._thread = None
+        self._return_code = None
+        self.supports_terminate = False
+
+    def attach(self, thread: threading.Thread):
+        self._thread = thread
+
+    def set_return_code(self, return_code: int):
+        self._return_code = int(return_code)
+
+    def poll(self):
+        if self._thread and self._thread.is_alive():
+            return None
+        return self._return_code if self._return_code is not None else 0
+
+    def wait(self, timeout=None):
+        if self._thread:
+            self._thread.join(timeout)
+            if self._thread.is_alive():
+                raise subprocess.TimeoutExpired("inline-process", timeout)
+        return self.poll()
+
+class _QueuedLogWriter:
+    def __init__(self, push_line):
+        self._push_line = push_line
+        self._buffer = ""
+
+    def write(self, text):
+        if not text:
+            return 0
+        self._buffer += str(text)
+        while "\n" in self._buffer:
+            line, self._buffer = self._buffer.split("\n", 1)
+            self._push_line(line.rstrip("\r"))
+        return len(text)
+
+    def flush(self):
+        if self._buffer:
+            self._push_line(self._buffer.rstrip("\r"))
+            self._buffer = ""
+
+def _push_daily_log_line(line: str):
+    stripped = str(line or "").rstrip()
+    _log_buffer.append(stripped)
+    _log_queue.put(stripped)
+
+def _run_daily_analysis_inline(data_ini: str, data_fim: str, env_overrides: dict[str, str], proc_handle: _InlineProcessHandle):
+    old_argv = list(sys.argv)
+    env_marker = object()
+    old_env = {}
+    writer = _QueuedLogWriter(_push_daily_log_line)
+    return_code = 1
+    try:
+        for key, value in env_overrides.items():
+            old_env[key] = os.environ.get(key, env_marker)
+            os.environ[key] = value
+
+        sys.argv = [str(SCRIPT), "--data-inicial", data_ini, "--data-final", data_fim]
+        with contextlib.redirect_stdout(writer), contextlib.redirect_stderr(writer):
+            module = importlib.import_module("analisar_assinaturas_v3_vertexai")
+            module = importlib.reload(module)
+            result = module.main()
+            return_code = int(result) if isinstance(result, int) else 0
+    except SystemExit as exc:
+        code = exc.code
+        if isinstance(code, int):
+            return_code = code
+        else:
+            return_code = 0 if code in (None, False) else 1
+    except Exception:
+        traceback.print_exc(file=writer)
+        return_code = 1
+    finally:
+        writer.flush()
+        sys.argv = old_argv
+        for key, old_value in old_env.items():
+            if old_value is env_marker:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = old_value
+
+        proc_handle.set_return_code(return_code)
+        status = _classify_daily_run_status(return_code, list(_log_buffer))
+        if return_code != 0:
+            _push_daily_log_line(f"ERRO: O processo diário terminou com código {return_code}")
+        _record_current_run_if_needed(status, logs=list(_log_buffer))
+        _log_queue.put("__DONE__")
 
 # ── config ─────────────────────────────────────────────────────────────────────
 def _load_config() -> dict:
@@ -519,7 +612,10 @@ def _faturamento_set_cancelled():
         _persist_faturamento_exec_status()
 
 def _is_process_running() -> bool:
-    return _process is not None and _process.poll() is None
+    try:
+        return _process is not None and _process.poll() is None
+    except Exception:
+        return False
 
 def _parse_local_iso(ts: str | None) -> datetime | None:
     if not ts:
@@ -773,6 +869,24 @@ def run_analysis(body: RunIn):
         except queue.Empty:
             break
 
+    _set_current_run("diario", {
+        "started_at": datetime.now().isoformat(timespec="seconds"),
+        "data_inicial": data_ini,
+        "data_final": data_fim,
+    })
+
+    if IS_VERCEL:
+        proc_handle = _InlineProcessHandle()
+        _process = proc_handle
+        worker = threading.Thread(
+            target=_run_daily_analysis_inline,
+            args=(data_ini, data_fim, env, proc_handle),
+            daemon=True,
+        )
+        proc_handle.attach(worker)
+        worker.start()
+        return {"ok": True, "data_inicial": data_ini, "data_final": data_fim}
+
     _process = subprocess.Popen(
         [str(PYTHON), "-u", str(SCRIPT), "--data-inicial", data_ini, "--data-final", data_fim],
         stdout=subprocess.PIPE,
@@ -784,12 +898,6 @@ def run_analysis(body: RunIn):
         encoding="utf-8",
         errors="replace",
     )
-
-    _set_current_run("diario", {
-        "started_at": datetime.now().isoformat(timespec="seconds"),
-        "data_inicial": data_ini,
-        "data_final": data_fim,
-    })
 
     def _reader():
         try:
@@ -820,6 +928,8 @@ def run_analysis(body: RunIn):
 def stop_analysis():
     global _process
     if _process and _process.poll() is None:
+        if not getattr(_process, "supports_terminate", True):
+            return {"error": "Parar execução não é suportado nesta execução do Vercel; aguarde concluir."}
         mode = _current_run_mode()
         _terminate_process_tree(_process)
         try:

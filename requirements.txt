@@ -26,5 +26,8 @@ Pillow==10.1.0
 # Conversão de PDF
 PyMuPDF==1.26.6
 
+# Automacao navegador APLIS
+selenium>=4.25.0
+
 # Variáveis de Ambiente
 python-dotenv==1.0.0
