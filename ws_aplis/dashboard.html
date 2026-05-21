@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guias Assinadas · APLIS</title>
+  <style>
+    :root {
+      --bg: #07080f;
+      --surface: rgba(255,255,255,0.04);
+      --surface-hover: rgba(255,255,255,0.07);
+      --border: rgba(255,255,255,0.08);
+      --accent: #7c6df0;
+      --accent2: #4fd1c5;
+      --text: #e2e8f0;
+      --text-muted: #718096;
+      --yellow: #f6c90e;
+      --green: #48bb78;
+      --red: #fc8181;
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(124,109,240,0.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 110%, rgba(79,209,197,0.10) 0%, transparent 60%);
+    }
+
+    /* ---- Layout ---- */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 22px 36px;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      background: rgba(7,8,15,0.7);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo-dot {
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: grid; place-items: center;
+      font-size: 16px; font-weight: 800; color: #fff;
+    }
+
+    header h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+    header span { font-size: 12px; color: var(--text-muted); }
+
+    .header-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+
+    main { padding: 32px 36px; max-width: 1200px; margin: 0 auto; }
+
+    /* ---- Cards de Métricas ---- */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      backdrop-filter: blur(8px);
+      transition: background 0.2s;
+    }
+
+    .metric-card:hover { background: var(--surface-hover); }
+
+    .metric-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .metric-value { font-size: 30px; font-weight: 700; margin-top: 6px; }
+    .metric-value.yellow { color: var(--yellow); }
+    .metric-value.green  { color: var(--green); }
+    .metric-value.red    { color: var(--red); }
+    .metric-value.purple { color: var(--accent); }
+
+    /* ---- Barra de ações ---- */
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    input[type="text"] {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 14px;
+      color: var(--text);
+      font-size: 14px;
+      width: 260px;
+      outline: none;
+      transition: border 0.2s;
+    }
+    input[type="text"]:focus { border-color: var(--accent); }
+    input[type="text"]::placeholder { color: var(--text-muted); }
+
+    button {
+      padding: 9px 18px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    button:hover { opacity: 0.85; }
+    button:active { transform: scale(0.98); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #9f91f5);
+      color: #fff;
+    }
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-sync {
+      background: rgba(79,209,197,0.15);
+      color: var(--accent2);
+      border: 1px solid rgba(79,209,197,0.25);
+      font-size: 12px;
+      padding: 5px 10px;
+    }
+    .btn-view {
+      background: rgba(124,109,240,0.12);
+      color: var(--accent);
+      border: 1px solid rgba(124,109,240,0.2);
+      font-size: 12px;
+      padding: 5px 10px;
+    }
+
+    /* ---- Tabela / Cards ---- */
+    .req-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .req-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      backdrop-filter: blur(8px);
+      transition: background 0.2s, border-color 0.2s;
+      cursor: default;
+    }
+    .req-card:hover { background: var(--surface-hover); border-color: rgba(255,255,255,0.13); }
+
+    .req-code { font-size: 15px; font-weight: 600; font-family: 'Courier New', monospace; }
+    .req-uuid { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    .req-actions { display: flex; gap: 8px; align-items: center; }
+
+    /* ---- Badge de Status ---- */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; display: block; }
+
+    .badge-pendente {
+      background: rgba(246,201,14,0.12);
+      color: var(--yellow);
+      border: 1px solid rgba(246,201,14,0.25);
+    }
+    .badge-pendente::before { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); animation: pulse 2s infinite; }
+
+    .badge-assinado {
+      background: rgba(72,187,120,0.12);
+      color: var(--green);
+      border: 1px solid rgba(72,187,120,0.25);
+    }
+    .badge-assinado::before { background: var(--green); }
+
+    .badge-erro {
+      background: rgba(252,129,129,0.12);
+      color: var(--red);
+      border: 1px solid rgba(252,129,129,0.25);
+    }
+    .badge-erro::before { background: var(--red); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ---- Modal de Registro ---- */
+    .modal-bg {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      display: none;
+      place-items: center;
+    }
+    .modal-bg.open { display: grid; }
+
+    .modal {
+      background: #0f1018;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 28px;
+      width: 420px;
+      max-width: 95vw;
+    }
+    .modal h2 { font-size: 17px; margin-bottom: 20px; }
+    .modal label { font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 5px; }
+    .modal input { width: 100%; margin-bottom: 14px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+
+    /* ---- Log de Historico ---- */
+    .log-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-top: 30px;
+    }
+    .log-panel h3 { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .log-entry { font-size: 12px; padding: 5px 0; border-bottom: 1px solid var(--border); display: flex; gap: 10px; }
+    .log-entry:last-child { border: none; }
+    .log-time { color: var(--text-muted); white-space: nowrap; }
+    .log-msg.ok { color: var(--green); }
+    .log-msg.warn { color: var(--yellow); }
+    .log-msg.err { color: var(--red); }
+
+    /* ---- Toast ---- */
+    #toast {
+      position: fixed;
+      bottom: 28px; right: 28px;
+      background: #1a1c2a;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 13px;
+      max-width: 320px;
+      z-index: 500;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.3s;
+      pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.ok { border-color: var(--green); color: var(--green); }
+    #toast.err { border-color: var(--red); color: var(--red); }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-dot">L</div>
+  <div>
+    <h1>Guias Assinadas</h1>
+    <span>APLIS · Autentique</span>
+  </div>
+  <div class="header-right">
+    <button class="btn-secondary" onclick="carregarRequisicoes()">↻ Atualizar</button>
+    <button class="btn-primary" onclick="abrirModal()">+ Registrar</button>
+  </div>
+</header>
+
+<main>
+  <!-- Métricas -->
+  <div class="metrics">
+    <div class="metric-card">
+      <div class="metric-label">Total</div>
+      <div class="metric-value purple" id="total-count">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Aguardando</div>
+      <div class="metric-value yellow" id="pendente-count">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Assinados</div>
+      <div class="metric-value green" id="assinado-count">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Erros</div>
+      <div class="metric-value red" id="erro-count">—</div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="Buscar requisição..." oninput="filtrar()" />
+    <button class="btn-secondary" onclick="carregarRequisicoes()">↻ Recarregar lista</button>
+  </div>
+
+  <!-- Lista -->
+  <div class="req-list" id="req-list">
+    <div class="empty-state">Carregando requisições...</div>
+  </div>
+
+  <!-- Log -->
+  <div class="log-panel">
+    <h3>Log de Atividade</h3>
+    <div id="log-entries"></div>
+  </div>
+</main>
+
+<!-- Modal Registrar -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <h2>Registrar Requisição</h2>
+    <label>Código da Requisição (APLIS)</label>
+    <input type="text" id="m-cod" placeholder="0040000356004" />
+    <label>UUID do Documento (Autentique)</label>
+    <input type="text" id="m-uuid" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-primary" onclick="registrar()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const API = '';
+  let _dados = {};
+  let _logs = [];
+
+  function log(msg, tipo = 'ok') {
+    const now = new Date().toLocaleTimeString('pt-BR');
+    _logs.unshift({ time: now, msg, tipo });
+    if (_logs.length > 50) _logs.pop();
+    renderLog();
+  }
+
+  function renderLog() {
+    const el = document.getElementById('log-entries');
+    if (!_logs.length) { el.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">Sem eventos</div>'; return; }
+    el.innerHTML = _logs.map(l =>
+      `<div class="log-entry"><span class="log-time">${l.time}</span><span class="log-msg ${l.tipo}">${l.msg}</span></div>`
+    ).join('');
+  }
+
+  function toast(msg, tipo = 'ok') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `show ${tipo}`;
+    setTimeout(() => el.className = '', 3500);
+  }
+
+  function badgeHtml(status) {
+    const map = {
+      pendente: ['badge-pendente', 'Aguardando Assinatura'],
+      assinado: ['badge-assinado', 'Assinado & Anexado'],
+      erro:     ['badge-erro',     'Erro'],
+    };
+    const [cls, label] = map[status] || ['badge-erro', status];
+    return `<span class="badge ${cls}">${label}</span>`;
+  }
+
+  async function carregarRequisicoes() {
+    try {
+      const resp = await fetch(`${API}/api/requisicoes`);
+      _dados = await resp.json();
+      renderLista(_dados);
+      atualizarMetricas(_dados);
+      log('Lista de requisições atualizada');
+    } catch(e) {
+      log('Erro ao carregar requisições: ' + e.message, 'err');
+    }
+  }
+
+  function atualizarMetricas(dados) {
+    const items = Object.values(dados);
+    document.getElementById('total-count').textContent = items.length;
+    document.getElementById('pendente-count').textContent = items.filter(i => i.status_assinatura === 'pendente').length;
+    document.getElementById('assinado-count').textContent = items.filter(i => i.status_assinatura === 'assinado').length;
+    document.getElementById('erro-count').textContent = items.filter(i => i.status_assinatura === 'erro').length;
+  }
+
+  function renderLista(dados) {
+    const query = document.getElementById('search').value.toLowerCase();
+    const el = document.getElementById('req-list');
+    const entries = Object.entries(dados).filter(([cod]) => !query || cod.includes(query));
+
+    if (!entries.length) {
+      el.innerHTML = '<div class="empty-state">Nenhuma requisição encontrada.<br>Use o botão <strong>+ Registrar</strong> para vincular uma.</div>';
+      return;
+    }
+
+    el.innerHTML = entries.map(([cod, info]) => {
+      const uuid = info.autentique_document_id || '';
+      const ultimo = info.historico?.slice(-1)[0];
+      const ultimoEvt = ultimo ? `<div class="req-uuid">${ultimo.evento} · ${ultimo.data?.slice(0,16).replace('T',' ')}</div>` : '';
+
+      const btnVer = info.status_assinatura === 'assinado' && info.url_guia_assinada
+        ? `<button class="btn-view" onclick="verGuia('${info.url_guia_assinada}')">Ver Guia</button>`
+        : '';
+
+      const btnSync = info.status_assinatura !== 'assinado'
+        ? `<button class="btn-sync" onclick="syncManual('${cod}')">Atualizar</button>`
+        : '';
+
+      return `
+        <div class="req-card">
+          <div>
+            <div class="req-code">${cod}</div>
+            <div class="req-uuid">UUID: ${uuid || '—'}</div>
+            ${ultimoEvt}
+          </div>
+          <div class="req-actions">
+            ${badgeHtml(info.status_assinatura)}
+            ${btnSync}
+            ${btnVer}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function filtrar() { renderLista(_dados); }
+
+  async function syncManual(cod) {
+    log(`Sincronizando requisição ${cod}...`, 'warn');
+    try {
+      const resp = await fetch(`${API}/api/requisicoes/${cod}/atualizar-assinatura`, { method: 'POST' });
+      const data = await resp.json();
+      if (data.sucesso) {
+        toast(`Guia de ${cod} anexada com sucesso!`, 'ok');
+        log(`Guia ${cod} anexada ao APLIS`, 'ok');
+      } else {
+        toast(data.mensagem || data.erro || 'Pendente', 'warn');
+        log(`${cod}: ${data.mensagem || data.erro}`, 'warn');
+      }
+      await carregarRequisicoes();
+    } catch(e) {
+      toast('Erro na sincronização: ' + e.message, 'err');
+      log('Erro sync: ' + e.message, 'err');
+    }
+  }
+
+  function verGuia(caminho) {
+    if (caminho.startsWith('http')) {
+      window.open(caminho, '_blank');
+    } else {
+      toast('Arquivo salvo em: ' + caminho, 'ok');
+    }
+  }
+
+  function abrirModal() { document.getElementById('modal-bg').classList.add('open'); }
+  function fecharModal() { document.getElementById('modal-bg').classList.remove('open'); }
+
+  async function registrar() {
+    const cod = document.getElementById('m-cod').value.trim();
+    const uuid = document.getElementById('m-uuid').value.trim();
+    if (!cod || !uuid) { toast('Preencha os dois campos', 'err'); return; }
+
+    try {
+      const resp = await fetch(`${API}/api/requisicoes/${cod}/registrar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uuid_autentique: uuid }),
+      });
+      const data = await resp.json();
+      if (data.sucesso) {
+        toast(`Requisição ${cod} registrada!`, 'ok');
+        log(`Registrada: ${cod} → ${uuid}`, 'ok');
+        fecharModal();
+        await carregarRequisicoes();
+      } else {
+        toast('Erro ao registrar', 'err');
+      }
+    } catch(e) {
+      toast('Erro: ' + e.message, 'err');
+    }
+  }
+
+  // Fecha modal ao clicar fora
+  document.getElementById('modal-bg').addEventListener('click', e => {
+    if (e.target === e.currentTarget) fecharModal();
+  });
+
+  // Carga inicial
+  carregarRequisicoes();
+  log('Dashboard iniciado');
+
+  // Auto-refresh a cada 30s
+  setInterval(carregarRequisicoes, 30000);
+</script>
+</body>
+</html>

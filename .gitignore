@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+
+# Credenciais e env
+.env
+*.json
+!frontend/package.json
+!frontend/package-lock.json
+
+# Imagens baixadas da AWS (temporárias)
+IMAGENS AWS/
+
+# Relatórios gerados (não versionar CSVs)
+relatorios/*.csv
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.production
+
+# Config gerada em runtime
+config.json
