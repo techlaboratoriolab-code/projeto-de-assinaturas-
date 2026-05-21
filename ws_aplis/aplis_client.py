@@ -97,14 +97,14 @@ class AplisClient:
             "idLaboratorio": APLIS_ID_LABORATORIO,
             "imagens": [
                 {
-                    "tipo": 5, # Alterado para 5 (Documento) conforme página 5 da documentação
+                    "tipo": APLIS_TIPO_IMAGEM_GUIA,
                     "extensao": "PDF",
                     "arquivo": pdf_b64,
                 }
             ],
         }
 
-        print(f"📎 Anexando guia assinada à requisição {cod_requisicao} (Tipo 5)...")
+        print(f"📎 Anexando guia assinada à requisição {cod_requisicao} (Tipo {APLIS_TIPO_IMAGEM_GUIA})...")
         resultado = self._post("admissaoSalvar", dat)
         dat_resp = resultado.get("dat", {})
 

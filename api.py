@@ -2230,7 +2230,7 @@ def aplis_anexar_guia(cod_requisicao: str):
     """
     import base64 as _b64
     from ws_aplis.config_ws import (
-        APLIS_API_URL, APLIS_USER, APLIS_PASS, APLIS_ID_LABORATORIO
+        APLIS_API_URL, APLIS_USER, APLIS_PASS, APLIS_ID_LABORATORIO, APLIS_TIPO_IMAGEM_GUIA
     )
     from ws_aplis.autentique_client import buscar_documentos_por_nome, buscar_documento, baixar_pdf_assinado
     from ws_aplis.aplis_client import AplisClient
@@ -2238,6 +2238,47 @@ def aplis_anexar_guia(cod_requisicao: str):
     cod = ''.join(ch for ch in str(cod_requisicao or '') if ch.isdigit())
     if len(cod) != 13:
         return {"sucesso": False, "erro": f"Código inválido: '{cod_requisicao}'"}
+
+    def _ja_possui_guia_assinada_db(cod_requisicao: str):
+        try:
+            import mysql.connector
+            conn = mysql.connector.connect(
+                host=os.getenv("DB_HOST", "localhost"),
+                port=int(os.getenv("DB_PORT", "3306")),
+                user=os.getenv("DB_USER", "root"),
+                password=os.getenv("DB_PASSWORD"),
+                database=os.getenv("DB_NAME"),
+            )
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                """
+                SELECT COUNT(*) AS qtd
+                FROM requisicaoimagem ri
+                JOIN requisicao r ON r.IdRequisicao = ri.IdRequisicao
+                WHERE r.CodRequisicao = %s
+                  AND ri.Inativo = 0
+                  AND ri.Tipo = %s
+                  AND UPPER(COALESCE(ri.ExtArquivo, '')) = 'PDF'
+                """,
+                (cod_requisicao, int(APLIS_TIPO_IMAGEM_GUIA)),
+            )
+            row = cur.fetchone() or {}
+            cur.close()
+            conn.close()
+            return int(row.get("qtd") or 0) > 0
+        except Exception as e:
+            print(f"[APLIS-ANEXAR] Aviso: não foi possível verificar anexo pré-existente: {e}")
+            return False
+
+    if _ja_possui_guia_assinada_db(cod):
+        msg = "Guia assinada já anexada anteriormente no APLIS para esta requisição."
+        print(f"[APLIS-ANEXAR] {msg}")
+        return {
+            "sucesso": True,
+            "ja_anexado": True,
+            "codRequisicao": cod,
+            "mensagem": msg,
+        }
 
     # 1. Buscar documento no Autentique pelo nome
     print(f"[APLIS-ANEXAR] Buscando documento para requisição {cod} no Autentique...")
@@ -2367,7 +2408,7 @@ def aplis_anexar_guia(cod_requisicao: str):
                     "examesConvenio": [int(row["CodExame"])],
                     "imagens": [
                         {
-                            "tipo": 5,
+                            "tipo": int(APLIS_TIPO_IMAGEM_GUIA),
                             "extensao": "PDF",
                             "arquivo": pdf_b64,
                         }
@@ -2494,7 +2535,7 @@ def aplis_anexar_guia(cod_requisicao: str):
                 "exames": exames_sanitizados,
                 "imagens": imagens_existentes + [
                     {
-                        "tipo": 5,
+                        "tipo": int(APLIS_TIPO_IMAGEM_GUIA),
                         "extensao": "PDF",
                         "arquivo": pdf_b64,
                     }
@@ -2537,7 +2578,7 @@ def aplis_anexar_guia(cod_requisicao: str):
                     "idLaboratorio": APLIS_ID_LABORATORIO,
                     "imagens": [
                         {
-                            "tipo": 5,
+                            "tipo": int(APLIS_TIPO_IMAGEM_GUIA),
                             "extensao": "PDF",
                             "arquivo": pdf_b64,
                         }

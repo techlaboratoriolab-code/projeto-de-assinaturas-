@@ -581,6 +581,8 @@ function AbaDocumentos() {
   const [page, setPage]               = useState(1)
   const [loading, setLoading]         = useState(false)
   const [error, setError]             = useState(null)
+  const [aplisMsg, setAplisMsg]       = useState(null)
+  const [aplisLocal, setAplisLocal]   = useState({})
   const [busca, setBusca]             = useState('')
   const { aplisData, refresh: refA }  = useAplisStatus()
   const [anexandoReq, setAnexandoReq] = useState('')
@@ -618,10 +620,20 @@ function AbaDocumentos() {
   }, [])
 
   const anexar = useCallback(async (req) => {
+    setError(null)
+    setAplisMsg(null)
     setAnexandoReq(req)
     try {
       const d = await chamarAnexa(req)
-      if (!d.sucesso) setError(d.erro || 'Falha ao anexar guia no APLIS')
+      if (!d.sucesso) {
+        setAplisLocal(prev => ({ ...prev, [req]: 'erro' }))
+        setError(d.erro || 'Falha ao anexar guia no APLIS')
+      } else {
+        setAplisLocal(prev => ({ ...prev, [req]: 'assinado' }))
+        setAplisMsg(d.ja_anexado
+          ? `Requisição ${req}: guia já estava anexada no APLIS.`
+          : `Requisição ${req}: guia anexada com sucesso no APLIS.`)
+      }
       refA()
     } catch { setError('Erro ao conectar ao WS APLIS') }
     setAnexandoReq('')
@@ -649,6 +661,7 @@ function AbaDocumentos() {
         <Btn onClick={() => fetchDocs(page)}>↻ Atualizar</Btn>
       </div>
       {error && <div style={{ color: '#f87171', fontSize: 12 }}>{error}</div>}
+      {aplisMsg && <div style={{ color: '#34d399', fontSize: 12 }}>{aplisMsg}</div>}
 
       {/* Tabela */}
       <Card>
@@ -681,7 +694,7 @@ function AbaDocumentos() {
                     </td>
                     <td style={TD}>
                       {(() => {
-                        const s = aplisData[doc.requisicao]?.status
+                        const s = aplisLocal[doc.requisicao] || aplisData[doc.requisicao]?.status
                         if (s) return <AplisStatusBadge status={s} />
                         if (!doc.assinado) return <span style={{ color: TX3 }}>—</span>
                         return <Btn onClick={() => anexar(doc.requisicao)} disabled={!!anexandoReq} variant="primary" style={{ fontSize: 11, padding: '3px 10px' }}>{anexandoReq === doc.requisicao ? 'Anexando…' : 'Anexar ao APLIS'}</Btn>
@@ -854,6 +867,8 @@ function AbaFaturamento({ running, logs, totalLines, runContext, executionSnapsh
   const [resumo, setResumo]           = useState({ total:0, enviados:0, assinados:0, pendentes:0, nao_enviados:0, rejeitados:0 })
   const [loading, setLoading]         = useState(false)
   const [error, setError]             = useState(null)
+  const [aplisMsg, setAplisMsg]       = useState(null)
+  const [aplisLocal, setAplisLocal]   = useState({})
   const [search, setSearch]           = useState('')
   const [convenio, setConvenio]       = useState('')
   const [autoRefresh, setAutoRefresh] = useState(true)
@@ -988,18 +1003,24 @@ function AbaFaturamento({ running, logs, totalLines, runContext, executionSnapsh
   }, [])
 
   const anexarAplis = useCallback(async (req) => {
+    setError(null)
+    setAplisMsg(null)
     setAnexandoReq(req)
     try {
       const d = await chamarAnexa(req)
-      const detalhe = d.detalhe ? `\n\n${d.detalhe}` : ''
       if (d.sucesso) {
-        alert('✅ Guia anexada com sucesso no APLIS!')
+        setAplisLocal(prev => ({ ...prev, [req]: 'assinado' }))
+        setAplisMsg(d.ja_anexado
+          ? `Requisição ${req}: guia já estava anexada no APLIS.`
+          : `Requisição ${req}: guia anexada com sucesso no APLIS.`)
       } else {
-        alert(`❌ ${d.erro || 'Falha ao anexar'}${detalhe}`)
+        setAplisLocal(prev => ({ ...prev, [req]: 'erro' }))
+        const detalhe = d.detalhe ? ` | ${String(d.detalhe).slice(0, 180)}` : ''
+        setError(`${d.erro || 'Falha ao anexar'}${detalhe}`)
       }
       refA()
     } catch (e) {
-      alert(`💥 Erro de conexão:\n${e.message}`)
+      setError(`Erro de conexão ao anexar no APLIS: ${e.message}`)
     }
     setAnexandoReq('')
   }, [refA])
@@ -1135,6 +1156,7 @@ function AbaFaturamento({ running, logs, totalLines, runContext, executionSnapsh
       </div>
 
       {error && <div style={{ color: '#f87171', fontSize: 12, padding: '8px 12px', background: 'rgba(248,113,113,0.08)', border: '0.5px solid rgba(248,113,113,0.2)', borderRadius: 8 }}>{error}</div>}
+      {aplisMsg && <div style={{ color: '#34d399', fontSize: 12, padding: '8px 12px', background: 'rgba(52,211,153,0.08)', border: '0.5px solid rgba(52,211,153,0.25)', borderRadius: 8 }}>{aplisMsg}</div>}
       {outroRodando && <div style={{ color: '#fbbf24', fontSize: 12 }}>Análise geral em execução. Aguarde para iniciar faturamento.</div>}
 
       {/* Histórico de execuções */}
@@ -1174,7 +1196,7 @@ function AbaFaturamento({ running, logs, totalLines, runContext, executionSnapsh
                       <td style={{ ...TD, color: '#34d399', fontSize: 11.5, whiteSpace: 'nowrap' }}>{fmtDate(it.assinado_em) || '—'}</td>
                       <td style={TD}>
                         {(() => {
-                          const s = aplisData[it.requisicao]?.status
+                          const s = aplisLocal[it.requisicao] || aplisData[it.requisicao]?.status
                           if (s) return <AplisStatusBadge status={s} />
                           if (String(it.status_documento||'').toUpperCase() !== 'ASSINADO') return <span style={{color:TX3}}>—</span>
                           return <Btn onClick={() => anexarAplis(it.requisicao)} disabled={!!anexandoReq} variant="primary" style={{ fontSize: 10, padding: '3px 8px' }}>{anexandoReq === it.requisicao ? 'Anexando…' : 'Anexar APLIS'}</Btn>
