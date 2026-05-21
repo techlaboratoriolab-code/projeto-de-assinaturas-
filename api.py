@@ -2276,22 +2276,78 @@ def aplis_anexar_guia(cod_requisicao: str):
 
     print(f"[APLIS-ANEXAR] PDF baixado: {len(pdf_bytes)} bytes")
 
-    # 4. Conectar no APLIS e anexar (API é stateless, sem comando de login)
+    # 4. Buscar dados completos da requisicao no APLIS e reenviar com a imagem
     try:
         client = AplisClient()
-        # Tenta anexar direto — a API do APLIS nao tem comando "login",
-        # a autenticacao eh por IP/sessao HTTP.
-        resultado = client.anexar_guia_assinada(cod, pdf_bytes)
+        
+        # Primeiro consulta os dados existentes da requisicao
+        print(f"[APLIS-ANEXAR] Consultando dados da requisição {cod}...")
+        status_resp = client._post("requisicaoStatus", {"codRequisicao": cod})
+        status_dat = status_resp.get("dat", {})
+        
+        if status_dat.get("sucesso") != 1:
+            return {
+                "sucesso": False,
+                "erro": f"Não foi possível consultar a requisição {cod} no APLIS",
+                "detalhe": f"Código: {status_dat.get('codErro')} | {status_dat.get('msgErro')}"
+            }
+        
+        print(f"[APLIS-ANEXAR] Dados obtidos: {json.dumps(status_dat, default=str)[:300]}")
+        
+        # Monta o payload completo com os dados existentes + a nova imagem
+        pdf_b64 = _b64.b64encode(pdf_bytes).decode("utf-8")
+        imagens_existentes = status_dat.get("imagens", []) or []
+        
+        admissao_dat = {
+            "codRequisicao": cod,
+            "idLaboratorio": APLIS_ID_LABORATORIO,
+            "idUnidade": status_dat.get("idUnidade"),
+            "idMedico": status_dat.get("idMedico"),
+            "idConvenio": status_dat.get("idConvenio"),
+            "idLocalOrigem": status_dat.get("idLocalOrigem"),
+            "idPrestadorOrigem": status_dat.get("idPrestadorOrigem"),
+            "idFontePagadora": status_dat.get("idFontePagadora"),
+            "idTabelaPreco": status_dat.get("idTabelaPreco"),
+            "idCobranca": status_dat.get("idCobranca"),
+            "idPaciente": status_dat.get("idPaciente"),
+            "idExame": status_dat.get("idExame"),
+            "idOrcamento": status_dat.get("idOrcamento"),
+            "idCobrancaConvenio": status_dat.get("idCobrancaConvenio"),
+            "idCobrancaConvenio2": status_dat.get("idCobrancaConvenio2"),
+            "numGuia": status_dat.get("numGuia"),
+            "senha": status_dat.get("senha"),
+            "senha2": status_dat.get("senha2"),
+            "parcial": status_dat.get("parcial"),
+            "tipoAtendimento": status_dat.get("tipoAtendimento"),
+            "acomodacao": status_dat.get("acomodacao"),
+            "dataColeta": status_dat.get("dataColeta"),
+            "dataColeta2": status_dat.get("dataColeta2"),
+            "exames": status_dat.get("exames"),
+            "imagens": imagens_existentes + [
+                {
+                    "tipo": 5,
+                    "extensao": "PDF",
+                    "arquivo": pdf_b64,
+                }
+            ],
+        }
+        
+        # Remove campos vazios para nao sobreescrever com null
+        admissao_dat = {k: v for k, v in admissao_dat.items() if v is not None and v != '' and v != []}
+        
+        print(f"[APLIS-ANEXAR] Reenviando requisição {cod} com imagem anexada...")
+        resultado = client._post("admissaoSalvar", admissao_dat)
+        dat_resp = resultado.get("dat", {})
+        
+        if dat_resp.get("sucesso") == 1:
+            print(f"[APLIS-ANEXAR] ✅ Sucesso! Requisição {cod} anexada.")
+            return {"sucesso": True, "codRequisicao": cod, "aplis_resposta": dat_resp}
+        else:
+            erro = f"[{dat_resp.get('codErro')}] {dat_resp.get('msgErro')}"
+            print(f"[APLIS-ANEXAR] ❌ {erro}")
+            return {"sucesso": False, "erro": f"APLIS rejeitou: {erro}", "detalhe": str(dat_resp)}
     except Exception as e:
         return {"sucesso": False, "erro": f"Exceção ao anexar no APLIS: {str(e)}"}
-
-    if resultado.get("sucesso") == 1:
-        print(f"[APLIS-ANEXAR] ✅ Sucesso! Requisição {cod} anexada.")
-        return {"sucesso": True, "codRequisicao": cod, "aplis_resposta": resultado}
-    else:
-        erro = f"[{resultado.get('codErro')}] {resultado.get('msgErro')}"
-        print(f"[APLIS-ANEXAR] ❌ {erro}")
-        return {"sucesso": False, "erro": f"APLIS rejeitou: {erro}", "detalhe": str(resultado)}
 
 # ── serve frontend buildado ────────────────────────────────────────────────────
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
