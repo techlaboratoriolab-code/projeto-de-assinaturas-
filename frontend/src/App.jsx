@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar, Line } from 'recharts'
 
 const API = (import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.host}`).replace(/\/$/, '')
-const WS_APLIS_API = (import.meta.env.VITE_WS_APLIS_URL || `${window.location.protocol}//${window.location.hostname}:8000`).replace(/\/$/, '')
+const WS_APLIS_API = (import.meta.env.VITE_WS_APLIS_URL || `${window.location.protocol}//${window.location.host}/ws_aplis`).replace(/\/$/, '')
 const MAX_LOG_LINES = 2000
 
 // ── Design tokens ─────────────────────────────────────────────────────────────

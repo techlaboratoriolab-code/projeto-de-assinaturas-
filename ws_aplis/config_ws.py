@@ -32,11 +32,14 @@ WS_HOST = os.getenv("WS_HOST", "0.0.0.0")
 WS_PORT = int(os.getenv("WS_PORT", "8000"))
 
 # ==================== STORAGE LOCAL ====================
+IS_VERCEL = os.getenv("VERCEL") == "1"
+DATA_DIR_WS = "/tmp" if IS_VERCEL else os.path.dirname(__file__)
+
 PASTA_GUIAS_ASSINADAS = os.getenv(
     "PASTA_GUIAS_ASSINADAS",
-    r"C:\guias_assinadas"
+    os.path.join(DATA_DIR_WS, "guias_assinadas")
 )
 
 # ==================== BANCO DE DADOS SIMPLES (JSON) ====================
 # Arquivo JSON que mapeia requisicao -> documento Autentique
-DB_PATH = os.path.join(os.path.dirname(__file__), "db_assinaturas.json")
+DB_PATH = os.path.join(DATA_DIR_WS, "db_assinaturas.json")

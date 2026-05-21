@@ -10,6 +10,7 @@ Execute com:
 import os
 import sys
 import json
+from ws_aplis.webhook_server import app as ws_app
 import csv
 import io
 import queue
@@ -82,6 +83,7 @@ AUTENTIQUE_STATUS_MAX_PAGES = int(os.getenv("AUTENTIQUE_STATUS_MAX_PAGES", "80")
 AUTENTIQUE_STATUS_PAGE_LIMIT = int(os.getenv("AUTENTIQUE_STATUS_PAGE_LIMIT", "20"))
 
 app = FastAPI(title="Assinaturas API")
+app.mount("/ws_aplis", ws_app)
 
 app.add_middleware(
     CORSMiddleware,
