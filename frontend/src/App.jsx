@@ -36,8 +36,11 @@ function useAplisStatus() {
 }
 
 async function chamarAnexa(requisicao) {
+  console.info('[APLIS] anexar:start', { requisicao })
   const r = await fetch(`${API}/api/aplis/anexar/${encodeURIComponent(requisicao)}`, { method: 'POST' })
-  return r.json()
+  const d = await r.json()
+  console.info('[APLIS] anexar:response', { requisicao, httpStatus: r.status, body: d })
+  return d
 }
 
 // ── Log helpers ───────────────────────────────────────────────────────────────
@@ -630,9 +633,13 @@ function AbaDocumentos() {
         setError(d.erro || 'Falha ao anexar guia no APLIS')
       } else {
         setAplisLocal(prev => ({ ...prev, [req]: 'assinado' }))
+        const meta = d.anexo_aplis
+        const sufixo = meta
+          ? ` (idImagem ${meta.idRequisicaoImagem}, tipo ${meta.tipo}, arquivo ${meta.arquivo}.${String(meta.extensao || '').toLowerCase()})`
+          : ''
         setAplisMsg(d.ja_anexado
-          ? `Requisição ${req}: guia já estava anexada no APLIS.`
-          : `Requisição ${req}: guia anexada com sucesso no APLIS.`)
+          ? `Requisição ${req}: guia já estava anexada no APLIS.${sufixo}`
+          : `Requisição ${req}: guia anexada com sucesso no APLIS.${sufixo}`)
       }
       refA()
     } catch { setError('Erro ao conectar ao WS APLIS') }
@@ -1010,9 +1017,13 @@ function AbaFaturamento({ running, logs, totalLines, runContext, executionSnapsh
       const d = await chamarAnexa(req)
       if (d.sucesso) {
         setAplisLocal(prev => ({ ...prev, [req]: 'assinado' }))
+        const meta = d.anexo_aplis
+        const sufixo = meta
+          ? ` (idImagem ${meta.idRequisicaoImagem}, tipo ${meta.tipo}, arquivo ${meta.arquivo}.${String(meta.extensao || '').toLowerCase()})`
+          : ''
         setAplisMsg(d.ja_anexado
-          ? `Requisição ${req}: guia já estava anexada no APLIS.`
-          : `Requisição ${req}: guia anexada com sucesso no APLIS.`)
+          ? `Requisição ${req}: guia já estava anexada no APLIS.${sufixo}`
+          : `Requisição ${req}: guia anexada com sucesso no APLIS.${sufixo}`)
       } else {
         setAplisLocal(prev => ({ ...prev, [req]: 'erro' }))
         const detalhe = d.detalhe ? ` | ${String(d.detalhe).slice(0, 180)}` : ''

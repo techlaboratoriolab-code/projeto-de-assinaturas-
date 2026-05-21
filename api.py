@@ -2270,14 +2270,64 @@ def aplis_anexar_guia(cod_requisicao: str):
             print(f"[APLIS-ANEXAR] Aviso: não foi possível verificar anexo pré-existente: {e}")
             return False
 
+    def _buscar_ultimo_anexo_aplis_db(cod_requisicao: str):
+        try:
+            import mysql.connector
+            conn = mysql.connector.connect(
+                host=os.getenv("DB_HOST", "localhost"),
+                port=int(os.getenv("DB_PORT", "3306")),
+                user=os.getenv("DB_USER", "root"),
+                password=os.getenv("DB_PASSWORD"),
+                database=os.getenv("DB_NAME"),
+            )
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                """
+                SELECT
+                    ri.IdRequisicaoImagem,
+                    ri.IdRequisicao,
+                    ri.Tipo,
+                    ri.ExtArquivo,
+                    ri.NomArquivo,
+                    ri.Inativo
+                FROM requisicaoimagem ri
+                JOIN requisicao r ON r.IdRequisicao = ri.IdRequisicao
+                WHERE r.CodRequisicao = %s
+                  AND ri.Inativo = 0
+                  AND ri.Tipo = %s
+                  AND UPPER(COALESCE(ri.ExtArquivo, '')) = 'PDF'
+                ORDER BY ri.IdRequisicaoImagem DESC
+                LIMIT 1
+                """,
+                (cod_requisicao, int(APLIS_TIPO_IMAGEM_GUIA)),
+            )
+            row = cur.fetchone()
+            cur.close()
+            conn.close()
+            if not row:
+                return None
+            return {
+                "idRequisicaoImagem": row.get("IdRequisicaoImagem"),
+                "idRequisicao": row.get("IdRequisicao"),
+                "tipo": row.get("Tipo"),
+                "extensao": row.get("ExtArquivo"),
+                "arquivo": row.get("NomArquivo"),
+                "inativo": row.get("Inativo"),
+            }
+        except Exception as e:
+            print(f"[APLIS-ANEXAR] Aviso: não foi possível buscar metadados do anexo: {e}")
+            return None
+
     if _ja_possui_guia_assinada_db(cod):
         msg = "Guia assinada já anexada anteriormente no APLIS para esta requisição."
         print(f"[APLIS-ANEXAR] {msg}")
+        anexo_info = _buscar_ultimo_anexo_aplis_db(cod)
         return {
             "sucesso": True,
             "ja_anexado": True,
             "codRequisicao": cod,
             "mensagem": msg,
+            "anexo_aplis": anexo_info,
         }
 
     # 1. Buscar documento no Autentique pelo nome
@@ -2589,7 +2639,13 @@ def aplis_anexar_guia(cod_requisicao: str):
         
         if dat_resp.get("sucesso") == 1:
             print(f"[APLIS-ANEXAR] ✅ Sucesso! Requisição {cod} anexada.")
-            return {"sucesso": True, "codRequisicao": cod, "aplis_resposta": dat_resp}
+            anexo_info = _buscar_ultimo_anexo_aplis_db(cod)
+            return {
+                "sucesso": True,
+                "codRequisicao": cod,
+                "aplis_resposta": dat_resp,
+                "anexo_aplis": anexo_info,
+            }
         else:
             erro = f"[{dat_resp.get('codErro')}] {dat_resp.get('msgErro')}"
             print(f"[APLIS-ANEXAR] ❌ {erro}")
