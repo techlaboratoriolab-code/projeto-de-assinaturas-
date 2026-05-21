@@ -991,10 +991,11 @@ function AbaFaturamento({ running, logs, totalLines, runContext, executionSnapsh
     setAnexandoReq(req)
     try {
       const d = await chamarAnexa(req)
+      const detalhe = d.detalhe ? `\n\n${d.detalhe}` : ''
       if (d.sucesso) {
         alert('✅ Guia anexada com sucesso no APLIS!')
       } else {
-        alert(`❌ ${d.erro || 'Falha ao anexar'}`)
+        alert(`❌ ${d.erro || 'Falha ao anexar'}${detalhe}`)
       }
       refA()
     } catch (e) {
