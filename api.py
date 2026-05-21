@@ -2396,48 +2396,48 @@ def aplis_anexar_guia(cod_requisicao: str):
             print("[APLIS-ANEXAR] Sem dados suficientes no DB local. Tentando fallback por requisicaoStatus.")
 
             def _limpar_escalar(valor):
-            if valor is None:
-                return None
-            if isinstance(valor, (dict, list, tuple, set)):
-                return None
-            if isinstance(valor, str):
-                v = valor.strip()
-                if not v or v.lower() in ("null", "none", "undefined"):
+                if valor is None:
                     return None
-                return v
-            return valor
+                if isinstance(valor, (dict, list, tuple, set)):
+                    return None
+                if isinstance(valor, str):
+                    v = valor.strip()
+                    if not v or v.lower() in ("null", "none", "undefined"):
+                        return None
+                    return v
+                return valor
 
             def _norm_key(chave):
-            return ''.join(ch for ch in str(chave or '').lower() if ch.isalnum())
+                return ''.join(ch for ch in str(chave or '').lower() if ch.isalnum())
 
             def _iter_dicts(obj):
-            if isinstance(obj, dict):
-                yield obj
-                for v in obj.values():
-                    yield from _iter_dicts(v)
-            elif isinstance(obj, list):
-                for item in obj:
-                    yield from _iter_dicts(item)
+                if isinstance(obj, dict):
+                    yield obj
+                    for v in obj.values():
+                        yield from _iter_dicts(v)
+                elif isinstance(obj, list):
+                    for item in obj:
+                        yield from _iter_dicts(item)
 
             all_dicts = list(_iter_dicts(status_dat))
 
             def _pick(*chaves):
-            chaves_norm = {_norm_key(c) for c in chaves}
-            for d in all_dicts:
-                for k, v in d.items():
-                    if _norm_key(k) in chaves_norm:
-                        vv = _limpar_escalar(v)
-                        if vv is not None:
-                            return vv
-            return None
+                chaves_norm = {_norm_key(c) for c in chaves}
+                for d in all_dicts:
+                    for k, v in d.items():
+                        if _norm_key(k) in chaves_norm:
+                            vv = _limpar_escalar(v)
+                            if vv is not None:
+                                return vv
+                return None
 
             def _pick_list(*chaves):
-            chaves_norm = {_norm_key(c) for c in chaves}
-            for d in all_dicts:
-                for k, v in d.items():
-                    if _norm_key(k) in chaves_norm and isinstance(v, list):
-                        return v
-            return []
+                chaves_norm = {_norm_key(c) for c in chaves}
+                for d in all_dicts:
+                    for k, v in d.items():
+                        if _norm_key(k) in chaves_norm and isinstance(v, list):
+                            return v
+                return []
 
             # Monta payload de fallback usando o que houver no requisicaoStatus.
             imagens_existentes = _pick_list("imagens", "listaImagens", "imagensRequisicao")
