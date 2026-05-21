@@ -25,18 +25,33 @@ class AplisClient:
 
     def _post(self, cmd: str, dat: dict) -> dict:
         payload = {"ver": APLIS_API_VER, "cmd": cmd, "dat": dat}
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        }
+        # Tenta como JSON primeiro, com Basic Auth caso o servidor exija
         try:
-            resp = self.session.post(APLIS_API_URL, json=payload, timeout=30)
-            resp.raise_for_status()
-            return resp.json()
-        except requests.exceptions.RequestException as e:
-            msg = f"Erro de rede na API APLIS: {str(e)}"
-            print(f"❌ {msg}")
-            return {"dat": {"sucesso": 0, "codErro": -1, "msgErro": msg}}
+            resp = self.session.post(
+                APLIS_API_URL,
+                json=payload,
+                headers=headers,
+                auth=requests.auth.HTTPBasicAuth(APLIS_USER, APLIS_PASS),
+                timeout=30,
+            )
+            try:
+                data = resp.json()
+                return data
+            except ValueError:
+                pass
+            body = resp.text[:500]
+            return {"dat": {"sucesso": 0, "codErro": resp.status_code, "msgErro": f"HTTP {resp.status_code}: {body}"}}
+        except requests.exceptions.Timeout:
+            return {"dat": {"sucesso": 0, "codErro": -1, "msgErro": "Timeout ao conectar no APLIS"}}
+        except requests.exceptions.ConnectionError as e:
+            return {"dat": {"sucesso": 0, "codErro": -1, "msgErro": f"Falha de conexao: {str(e)}"}}
         except Exception as e:
-            msg = f"Erro inesperado na chamada APLIS: {str(e)}"
-            print(f"❌ {msg}")
-            return {"dat": {"sucesso": 0, "codErro": -3, "msgErro": msg}}
+            return {"dat": {"sucesso": 0, "codErro": -3, "msgErro": f"Erro inesperado: {str(e)}"}}
 
     def login(self) -> bool:
         """Autentica na API APLIS via login/senha."""
