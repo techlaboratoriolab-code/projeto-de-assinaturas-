@@ -7,6 +7,7 @@ __pycache__/
 # Credenciais e env
 .env
 *.json
+!vercel.json
 !frontend/package.json
 !frontend/package-lock.json
 
