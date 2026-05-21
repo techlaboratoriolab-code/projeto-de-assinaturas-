@@ -258,6 +258,8 @@ function ExecStatusBadge({ status }) {
   if (s === 'concluido')    return <Badge color="green">Concluído</Badge>
   if (s === 'cancelado')    return <Badge color="red">Cancelado</Badge>
   if (s === 'interrompido') return <Badge color="yellow">Interrompido</Badge>
+  if (s === 'sem_dados')    return <Badge color="yellow">Sem guias</Badge>
+  if (s === 'erro')         return <Badge color="red">Falhou</Badge>
   return <Badge color="gray">—</Badge>
 }
 

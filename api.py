@@ -306,6 +306,14 @@ def _parse_run_metrics_from_logs(lines: list[str]):
         "enviados": enviados,
     }
 
+def _classify_daily_run_status(return_code: int, lines: list[str] | None = None) -> str:
+    logs = [str(line or "") for line in (lines or [])]
+    if any("Nenhuma requisicao encontrada" in line for line in logs):
+        return "sem_dados"
+    if return_code != 0:
+        return "erro"
+    return "concluido"
+
 def _build_gerenciamento_summary(mode: str, rows: list[dict]):
     today = date.today()
     yesterday = today - timedelta(days=1)
@@ -772,13 +780,12 @@ def run_analysis(body: RunIn):
                 _log_queue.put(stripped)
             
             return_code = _process.wait()
+            status = _classify_daily_run_status(return_code, list(_log_buffer))
             if return_code != 0:
                 err_msg = f"ERRO: O processo diário terminou com código {return_code}"
                 _log_buffer.append(err_msg)
                 _log_queue.put(err_msg)
-                _record_current_run_if_needed("erro", logs=list(_log_buffer))
-            else:
-                _record_current_run_if_needed("concluido", logs=list(_log_buffer))
+            _record_current_run_if_needed(status, logs=list(_log_buffer))
         except Exception as e:
             err_msg = f"ERRO na thread de log diário: {str(e)}"
             _log_buffer.append(err_msg)

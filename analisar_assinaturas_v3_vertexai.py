@@ -34,6 +34,8 @@ try:
 except Exception:
     pass
 
+EXIT_CODE_NO_DATA = 2
+
 def _safe_console_text(value):
     """Normaliza texto para a codificacao do console atual sem quebrar execucao."""
     text = str(value)
@@ -2561,7 +2563,7 @@ def main():
             'periodo_tipo': info_periodo.get('tipo', ''),
             'periodo_referencia': info_periodo.get('referencia', ''),
         })
-        return
+        return EXIT_CODE_NO_DATA
 
     print(f"[OK] Encontradas: {len(requisicoes)} requisicoes")
 
@@ -2898,7 +2900,7 @@ Pedimos desculpas pelo transtorno."""
 
 if __name__ == "__main__":
     try:
-        main()
+        sys.exit(main() or 0)
     except Exception as e:
         print(f"[ERRO] Execução falhou: {e}")
         try:
