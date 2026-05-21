@@ -155,6 +155,18 @@ async def atualizar_assinatura_manual(cod_requisicao: str, request: Request):
         if registro:
             uuid_doc = registro.get("autentique_document_id", "")
 
+    # Fallback: Se não achou no DB local (comum no Vercel), tenta buscar na API do Autentique pelo nome (que contém a requisição)
+    if not uuid_doc:
+        print(f"🔍 UUID não encontrado no DB local para {cod_requisicao}. Buscando na API do Autentique...")
+        from autentique_client import buscar_documentos_por_nome
+        docs_encontrados = buscar_documentos_por_nome(cod_requisicao)
+        if docs_encontrados:
+            # Pega o mais recente que combine com a requisição
+            uuid_doc = docs_encontrados[0].get("id")
+            print(f"✅ Encontrado no Autentique: {uuid_doc}")
+            # Registra localmente para a próxima vez
+            db_local.registrar_envio(cod_requisicao, uuid_doc)
+
     if not uuid_doc:
         raise HTTPException(
             status_code=400,

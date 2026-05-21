@@ -38,6 +38,20 @@ query GetDocumento($id: UUID!) {
 """
 
 
+# Query para listar documentos por nome
+_QUERY_BUSCAR_POR_NOME = """
+query($page: Int!, $limit: Int!) {
+  documents(page: $page, limit: $limit) {
+    data {
+      id
+      name
+      created_at
+    }
+  }
+}
+"""
+
+
 def _graphql(query: str, variables: dict) -> dict:
     try:
         resp = requests.post(
@@ -57,6 +71,25 @@ def _graphql(query: str, variables: dict) -> dict:
 
     except requests.exceptions.RequestException as e:
         return {"sucesso": False, "erro": str(e), "data": None}
+
+
+def buscar_documentos_por_nome(termo: str, limit: int = 10) -> list:
+    """
+    Busca documentos na conta que contenham o termo no nome.
+    """
+    resultado = _graphql(_QUERY_BUSCAR_POR_NOME, {"page": 1, "limit": 60})
+    if not resultado["sucesso"] or not resultado["data"]:
+        return []
+    
+    docs = resultado["data"].get("documents", {}).get("data", [])
+    if not docs:
+        return []
+    
+    # Filtra localmente pelo termo (geralmente o número da requisição)
+    encontrados = [d for d in docs if termo in str(d.get("name", ""))]
+    # Ordena pelo mais recente
+    encontrados.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return encontrados
 
 
 def buscar_documento(doc_id: str) -> dict:
