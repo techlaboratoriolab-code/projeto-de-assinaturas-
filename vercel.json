@@ -17,6 +17,10 @@
       "dest": "api.py"
     },
     {
+      "src": "/ws_aplis/(.*)",
+      "dest": "api.py"
+    },
+    {
       "src": "/assets/(.*)",
       "dest": "/frontend/assets/$1"
     },
