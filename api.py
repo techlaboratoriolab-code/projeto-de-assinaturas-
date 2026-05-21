@@ -2279,9 +2279,16 @@ def aplis_anexar_guia(cod_requisicao: str):
     # 4. Conectar no APLIS e anexar
     try:
         client = AplisClient()
-        login_ok = client.login()
-        if not login_ok:
-            return {"sucesso": False, "erro": "Falha no login do APLIS. Verifique APLIS_USER e APLIS_PASSWORD"}
+        # Tenta login diretamente para capturar o erro real
+        login_resp = client._post("login", {"login": APLIS_USER, "senha": APLIS_PASS})
+        login_dat = login_resp.get("dat", {})
+        
+        if login_dat.get("sucesso") != 1:
+            return {
+                "sucesso": False,
+                "erro": "APLIS rejeitou o login",
+                "detalhe": f"URL: {APLIS_API_URL} | Código: {login_dat.get('codErro')} | Mensagem: {login_dat.get('msgErro')}"
+            }
         
         resultado = client.anexar_guia_assinada(cod, pdf_bytes)
     except Exception as e:
