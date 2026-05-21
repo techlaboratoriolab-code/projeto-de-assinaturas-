@@ -187,9 +187,23 @@ async def atualizar_assinatura_manual(cod_requisicao: str, request: Request):
             "assinantes": doc.get("assinantes", []),
         })
 
+    # ...
     url_assinado = doc.get("url_assinado", "")
-    resultado = await _processar_guia(cod_requisicao, url_assinado, uuid_doc)
-    return JSONResponse(resultado)
+    print(f"🔗 URL para download do PDF assinado: {url_assinado}")
+    
+    try:
+        resultado = await _processar_guia(cod_requisicao, url_assinado, uuid_doc)
+        print(f"🏁 Resultado do processamento: {resultado}")
+        return JSONResponse(resultado)
+    except Exception as e:
+        import traceback
+        err_trace = traceback.format_exc()
+        print(f"🔥 ERRO CRÍTICO no processamento: {err_trace}")
+        return JSONResponse({
+            "sucesso": False, 
+            "erro": f"Erro interno no servidor: {str(e)}",
+            "detalhe": err_trace[:200]
+        }, status_code=500)
 
 
 @app.get("/api/requisicoes/{cod_requisicao}/status")

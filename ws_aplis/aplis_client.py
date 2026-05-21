@@ -30,9 +30,13 @@ class AplisClient:
             resp.raise_for_status()
             return resp.json()
         except requests.exceptions.RequestException as e:
-            return {"dat": {"sucesso": 0, "codErro": -1, "msgErro": str(e)}}
-        except ValueError:
-            return {"dat": {"sucesso": 0, "codErro": -2, "msgErro": "Resposta inválida da API"}}
+            msg = f"Erro de rede na API APLIS: {str(e)}"
+            print(f"❌ {msg}")
+            return {"dat": {"sucesso": 0, "codErro": -1, "msgErro": msg}}
+        except Exception as e:
+            msg = f"Erro inesperado na chamada APLIS: {str(e)}"
+            print(f"❌ {msg}")
+            return {"dat": {"sucesso": 0, "codErro": -3, "msgErro": msg}}
 
     def login(self) -> bool:
         """Autentica na API APLIS via login/senha."""
