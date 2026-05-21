@@ -2211,6 +2211,90 @@ def faturamento_download_assinados(
 
     return FileResponse(path=zip_tmp.name, filename='faturamento_assinados.zip', media_type='application/zip')
 
+# ── APLIS: anexar guia assinada direto (sem depender do sub-app ws_aplis) ───────
+@app.post("/api/aplis/anexar/{cod_requisicao}")
+def aplis_anexar_guia(cod_requisicao: str):
+    """
+    Fluxo completo: busca documento no Autentique → baixa PDF → anexa no APLIS.
+    Criado especificamente para funcionar no Vercel sem depender de DB local.
+    """
+    import base64 as _b64
+    from ws_aplis.config_ws import (
+        APLIS_API_URL, APLIS_USER, APLIS_PASS, APLIS_ID_LABORATORIO
+    )
+    from ws_aplis.autentique_client import buscar_documentos_por_nome, buscar_documento, baixar_pdf_assinado
+    from ws_aplis.aplis_client import AplisClient
+
+    cod = ''.join(ch for ch in str(cod_requisicao or '') if ch.isdigit())
+    if len(cod) != 13:
+        return {"sucesso": False, "erro": f"Código inválido: '{cod_requisicao}'"}
+
+    # 1. Buscar documento no Autentique pelo nome
+    print(f"[APLIS-ANEXAR] Buscando documento para requisição {cod} no Autentique...")
+    try:
+        docs_encontrados = buscar_documentos_por_nome(cod, limit=60)
+    except Exception as e:
+        return {"sucesso": False, "erro": f"Erro ao buscar no Autentique: {str(e)}"}
+
+    if not docs_encontrados:
+        return {
+            "sucesso": False,
+            "erro": "Nenhum documento encontrado no Autentique com esta requisição no nome",
+            "detalhe": "Certifique-se de que o documento foi criado no Autentique com o número da requisição no nome"
+        }
+
+    uuid_doc = docs_encontrados[0].get("id")
+    nome_doc = docs_encontrados[0].get("name", "")
+    print(f"[APLIS-ANEXAR] Documento encontrado: {nome_doc} (ID: {uuid_doc})")
+
+    # 2. Verificar status do documento
+    try:
+        doc_info = buscar_documento(uuid_doc)
+    except Exception as e:
+        return {"sucesso": False, "erro": f"Erro ao consultar documento no Autentique: {str(e)}"}
+
+    if not doc_info.get("sucesso"):
+        return {"sucesso": False, "erro": f"Falha ao consultar Autentique: {doc_info.get('erro')}"}
+
+    url_assinado = doc_info.get("url_assinado", "")
+    if not url_assinado:
+        return {
+            "sucesso": False,
+            "erro": "Documento não possui PDF assinado disponível",
+            "detalhe": f"Status: {doc_info.get('status')}. Todos assinaram? {doc_info.get('todos_assinaram')}"
+        }
+
+    # 3. Baixar o PDF
+    print(f"[APLIS-ANEXAR] Baixando PDF assinado...")
+    try:
+        pdf_bytes = baixar_pdf_assinado(url_assinado)
+    except Exception as e:
+        return {"sucesso": False, "erro": f"Erro ao baixar PDF: {str(e)}"}
+
+    if not pdf_bytes:
+        return {"sucesso": False, "erro": "Falha ao baixar o PDF assinado do Autentique"}
+
+    print(f"[APLIS-ANEXAR] PDF baixado: {len(pdf_bytes)} bytes")
+
+    # 4. Conectar no APLIS e anexar
+    try:
+        client = AplisClient()
+        login_ok = client.login()
+        if not login_ok:
+            return {"sucesso": False, "erro": "Falha no login do APLIS. Verifique APLIS_USER e APLIS_PASSWORD"}
+        
+        resultado = client.anexar_guia_assinada(cod, pdf_bytes)
+    except Exception as e:
+        return {"sucesso": False, "erro": f"Exceção ao anexar no APLIS: {str(e)}"}
+
+    if resultado.get("sucesso") == 1:
+        print(f"[APLIS-ANEXAR] ✅ Sucesso! Requisição {cod} anexada.")
+        return {"sucesso": True, "codRequisicao": cod, "aplis_resposta": resultado}
+    else:
+        erro = f"[{resultado.get('codErro')}] {resultado.get('msgErro')}"
+        print(f"[APLIS-ANEXAR] ❌ {erro}")
+        return {"sucesso": False, "erro": f"APLIS rejeitou: {erro}", "detalhe": str(resultado)}
+
 # ── serve frontend buildado ────────────────────────────────────────────────────
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
 

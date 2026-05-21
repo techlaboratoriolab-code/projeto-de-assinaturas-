@@ -36,7 +36,7 @@ function useAplisStatus() {
 }
 
 async function chamarAnexa(requisicao) {
-  const r = await fetch(`${WS_APLIS_API}/api/requisicoes/${encodeURIComponent(requisicao)}/atualizar-assinatura`, { method: 'POST' })
+  const r = await fetch(`${API}/api/aplis/anexar/${encodeURIComponent(requisicao)}`, { method: 'POST' })
   return r.json()
 }
 
@@ -990,26 +990,15 @@ function AbaFaturamento({ running, logs, totalLines, runContext, executionSnapsh
   const anexarAplis = useCallback(async (req) => {
     setAnexandoReq(req)
     try {
-      console.log('Iniciando anexo APLIS para:', req);
-      const resp = await fetch(`${WS_APLIS_API}/api/requisicoes/${encodeURIComponent(req)}/atualizar-assinatura`, { 
-        method: 'POST',
-        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
-      });
-      
-      const d = await resp.json();
-      console.log('Resposta do servidor:', d);
-
+      const d = await chamarAnexa(req)
       if (d.sucesso) {
-        alert('✅ Guia anexada com sucesso no APLIS!');
+        alert('✅ Guia anexada com sucesso no APLIS!')
       } else {
-        const msg = d.erro || d.msgErro || 'Erro desconhecido';
-        const detalhe = d.detalhe ? `\n\nDetalhe técnico: ${d.detalhe}` : '';
-        alert(`❌ Falha ao anexar no APLIS:\n${msg}${detalhe}`);
+        alert(`❌ ${d.erro || 'Falha ao anexar'}`)
       }
       refA()
     } catch (e) {
-      console.error('Erro na chamada:', e);
-      alert(`💥 Erro de conexão com o servidor:\n${e.message}`);
+      alert(`💥 Erro de conexão:\n${e.message}`)
     }
     setAnexandoReq('')
   }, [refA])
