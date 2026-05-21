@@ -2279,17 +2279,14 @@ def aplis_anexar_guia(cod_requisicao: str):
     # 4. Conectar no APLIS e anexar
     try:
         client = AplisClient()
-        # Tenta login diretamente para capturar o erro real
         login_resp = client._post("login", {"login": APLIS_USER, "senha": APLIS_PASS})
         login_dat = login_resp.get("dat", {})
-        
+
+        cod_erro = login_dat.get('codErro')
+        msg_erro = login_dat.get('msgErro', '')
         if login_dat.get("sucesso") != 1:
-            return {
-                "sucesso": False,
-                "erro": "APLIS rejeitou o login",
-                "detalhe": f"URL: {APLIS_API_URL} | Código: {login_dat.get('codErro')} | Mensagem: {login_dat.get('msgErro')}"
-            }
-        
+            return {"sucesso": False, "erro": f"APLIS rejeitou login | URL: {APLIS_API_URL} | Código: {cod_erro} | Mensagem: {msg_erro}"}
+
         resultado = client.anexar_guia_assinada(cod, pdf_bytes)
     except Exception as e:
         return {"sucesso": False, "erro": f"Exceção ao anexar no APLIS: {str(e)}"}
