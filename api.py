@@ -2276,17 +2276,11 @@ def aplis_anexar_guia(cod_requisicao: str):
 
     print(f"[APLIS-ANEXAR] PDF baixado: {len(pdf_bytes)} bytes")
 
-    # 4. Conectar no APLIS e anexar
+    # 4. Conectar no APLIS e anexar (API é stateless, sem comando de login)
     try:
         client = AplisClient()
-        login_resp = client._post("login", {"login": APLIS_USER, "senha": APLIS_PASS})
-        login_dat = login_resp.get("dat", {})
-
-        cod_erro = login_dat.get('codErro')
-        msg_erro = login_dat.get('msgErro', '')
-        if login_dat.get("sucesso") != 1:
-            return {"sucesso": False, "erro": f"APLIS rejeitou login | URL: {APLIS_API_URL} | Código: {cod_erro} | Mensagem: {msg_erro}"}
-
+        # Tenta anexar direto — a API do APLIS nao tem comando "login",
+        # a autenticacao eh por IP/sessao HTTP.
         resultado = client.anexar_guia_assinada(cod, pdf_bytes)
     except Exception as e:
         return {"sucesso": False, "erro": f"Exceção ao anexar no APLIS: {str(e)}"}

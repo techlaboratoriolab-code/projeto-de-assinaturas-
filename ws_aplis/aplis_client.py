@@ -20,28 +20,22 @@ from config_ws import (
 class AplisClient:
     def __init__(self):
         self.session = requests.Session()
-        self.session.headers.update({"Content-Type": "application/json"})
+        self.session.headers.update({
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        })
+        # APLIS exige HTTP Basic Auth no nivel do servidor web
+        if APLIS_USER and APLIS_PASS:
+            self.session.auth = requests.auth.HTTPBasicAuth(APLIS_USER, APLIS_PASS)
         self._logado = False
 
     def _post(self, cmd: str, dat: dict) -> dict:
         payload = {"ver": APLIS_API_VER, "cmd": cmd, "dat": dat}
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        }
-        # Tenta como JSON primeiro, com Basic Auth caso o servidor exija
         try:
-            resp = self.session.post(
-                APLIS_API_URL,
-                json=payload,
-                headers=headers,
-                auth=requests.auth.HTTPBasicAuth(APLIS_USER, APLIS_PASS),
-                timeout=30,
-            )
+            resp = self.session.post(APLIS_API_URL, json=payload, timeout=30)
             try:
-                data = resp.json()
-                return data
+                return resp.json()
             except ValueError:
                 pass
             body = resp.text[:500]
@@ -117,15 +111,13 @@ class AplisClient:
         if dat_resp.get("sucesso") == 1:
             print(f"[OK] Guia anexada com sucesso → requisição {dat_resp.get('codRequisicao')}")
         else:
-            # Se falhou, tenta logar novamente e repetir uma única vez (sessão pode ter expirado)
-            print(f"[WARN] Falha na primeira tentativa de anexo ([{dat_resp.get('codErro')}]). Tentando re-login...")
-            self._logado = False
-            if self.login():
-                resultado = self._post("admissaoSalvar", dat)
-                dat_resp = resultado.get("dat", {})
-                if dat_resp.get("sucesso") == 1:
-                    print(f"[OK] Guia anexada com sucesso após re-login")
-                    return dat_resp
+            # Tenta novamente uma vez (pode ter sido erro temporário)
+            print(f"[WARN] Falha na primeira tentativa ([{dat_resp.get('codErro')}]). Tentando novamente...")
+            resultado = self._post("admissaoSalvar", dat)
+            dat_resp = resultado.get("dat", {})
+            if dat_resp.get("sucesso") == 1:
+                print(f"[OK] Guia anexada com sucesso na segunda tentativa")
+                return dat_resp
 
             print(f"[ERR] Falha ao anexar guia: [{dat_resp.get('codErro')}] {dat_resp.get('msgErro')}")
 
@@ -155,5 +147,5 @@ def get_client() -> AplisClient:
     global _client
     if _client is None:
         _client = AplisClient()
-        _client.login()
+        # APLIS API nao tem comando "login" — autenticacao eh por IP/HTTP Basic Auth
     return _client
