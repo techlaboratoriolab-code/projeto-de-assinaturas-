@@ -35,13 +35,19 @@ from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+IS_VERCEL = os.getenv("VERCEL") == "1"
 BASE_DIR   = Path(__file__).parent
+DATA_DIR   = Path("/tmp") if IS_VERCEL else BASE_DIR
+
 SCRIPT     = BASE_DIR / "analisar_assinaturas_v3_vertexai.py"
-PYTHON     = sys.executable if os.getenv("VERCEL") else (BASE_DIR / ".venv" / "Scripts" / "python.exe" if os.name == "nt" else "python3")
-CONFIG_F   = BASE_DIR / "config.json"
-RELATORIOS_DIR = BASE_DIR / "relatorios"
-IMAGENS_DIR = Path(os.getenv("DIRETORIO_IMAGENS", str(BASE_DIR / "IMAGENS AWS")))
+PYTHON     = sys.executable if IS_VERCEL else (BASE_DIR / ".venv" / "Scripts" / "python.exe" if os.name == "nt" else "python3")
+
+CONFIG_F   = DATA_DIR / "config.json"
+RELATORIOS_DIR = DATA_DIR / "relatorios"
+IMAGENS_DIR = Path(os.getenv("DIRETORIO_IMAGENS", str(DATA_DIR / "IMAGENS AWS")))
 FATURAMENTO_FILE = BASE_DIR / "docs" / "requisicoes_faturamento.txt"
+
+
 WAHA_URL = os.getenv("WAHA_URL", "http://localhost:4300").rstrip("/")
 WAHA_SESSION = os.getenv("WAHA_SESSION", "TIBOT")
 WAHA_API_KEY = os.getenv("WAHA_API_KEY")
@@ -750,19 +756,35 @@ def run_analysis(body: RunIn):
         errors="replace",
     )
 
-    def _reader():
-        for line in _process.stdout:
-            stripped = line.rstrip()
-            _log_buffer.append(stripped)
-            _log_queue.put(stripped)
-        _record_current_run_if_needed("concluido", logs=list(_log_buffer))
-        _log_queue.put("__DONE__")
-
     _set_current_run("diario", {
         "started_at": datetime.now().isoformat(timespec="seconds"),
         "data_inicial": data_ini,
         "data_final": data_fim,
     })
+
+    def _reader():
+        try:
+            for line in _process.stdout:
+                stripped = line.rstrip()
+                _log_buffer.append(stripped)
+                _log_queue.put(stripped)
+            
+            return_code = _process.wait()
+            if return_code != 0:
+                err_msg = f"ERRO: O processo diário terminou com código {return_code}"
+                _log_buffer.append(err_msg)
+                _log_queue.put(err_msg)
+                _record_current_run_if_needed("erro", logs=list(_log_buffer))
+            else:
+                _record_current_run_if_needed("concluido", logs=list(_log_buffer))
+        except Exception as e:
+            err_msg = f"ERRO na thread de log diário: {str(e)}"
+            _log_buffer.append(err_msg)
+            _log_queue.put(err_msg)
+            _record_current_run_if_needed("erro", logs=list(_log_buffer))
+        finally:
+            _log_queue.put("__DONE__")
+
     threading.Thread(target=_reader, daemon=True).start()
     return {"ok": True, "data_inicial": data_ini, "data_final": data_fim}
 
@@ -846,14 +868,31 @@ def run_faturamento(body: FaturamentoRunIn):
     })
 
     def _reader():
-        for line in _process.stdout:
-            stripped = line.rstrip()
-            _log_buffer.append(stripped)
-            _log_queue.put(stripped)
-            _faturamento_update_from_log_line(stripped)
-        _faturamento_set_finished()
-        _record_current_run_if_needed("concluido")
-        _log_queue.put("__DONE__")
+        try:
+            for line in _process.stdout:
+                stripped = line.rstrip()
+                _log_buffer.append(stripped)
+                _log_queue.put(stripped)
+                _faturamento_update_from_log_line(stripped)
+            
+            return_code = _process.wait()
+            if return_code != 0:
+                err_msg = f"ERRO: O processo faturamento terminou com código {return_code}"
+                _log_buffer.append(err_msg)
+                _log_queue.put(err_msg)
+                _faturamento_set_finished()
+                _record_current_run_if_needed("erro", logs=list(_log_buffer))
+            else:
+                _faturamento_set_finished()
+                _record_current_run_if_needed("concluido")
+        except Exception as e:
+            err_msg = f"ERRO na thread de log faturamento: {str(e)}"
+            _log_buffer.append(err_msg)
+            _log_queue.put(err_msg)
+            _faturamento_set_finished()
+            _record_current_run_if_needed("erro", logs=list(_log_buffer))
+        finally:
+            _log_queue.put("__DONE__")
 
     threading.Thread(target=_reader, daemon=True).start()
     return {
@@ -939,14 +978,31 @@ def run_faturamento_individual(body: FaturamentoRunIndividualIn):
     })
 
     def _reader():
-        for line in _process.stdout:
-            stripped = line.rstrip()
-            _log_buffer.append(stripped)
-            _log_queue.put(stripped)
-            _faturamento_update_from_log_line(stripped)
-        _faturamento_set_finished()
-        _record_current_run_if_needed("concluido")
-        _log_queue.put("__DONE__")
+        try:
+            for line in _process.stdout:
+                stripped = line.rstrip()
+                _log_buffer.append(stripped)
+                _log_queue.put(stripped)
+                _faturamento_update_from_log_line(stripped)
+            
+            return_code = _process.wait()
+            if return_code != 0:
+                err_msg = f"ERRO: O processo individual terminou com código {return_code}"
+                _log_buffer.append(err_msg)
+                _log_queue.put(err_msg)
+                _faturamento_set_finished()
+                _record_current_run_if_needed("erro", logs=list(_log_buffer))
+            else:
+                _faturamento_set_finished()
+                _record_current_run_if_needed("concluido")
+        except Exception as e:
+            err_msg = f"ERRO na thread de log individual: {str(e)}"
+            _log_buffer.append(err_msg)
+            _log_queue.put(err_msg)
+            _faturamento_set_finished()
+            _record_current_run_if_needed("erro", logs=list(_log_buffer))
+        finally:
+            _log_queue.put("__DONE__")
 
     threading.Thread(target=_reader, daemon=True).start()
     return {

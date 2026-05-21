@@ -59,8 +59,12 @@ AWS_SECRET_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
 AWS_REGION = os.getenv('AWS_REGION', 'sa-east-1')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME', 'aplis2')
 # diretórios locais
-DIRETORIO_IMAGENS = os.getenv('DIRETORIO_IMAGENS', r'C:\Users\Windows 11\Desktop\imagemAWS')
-DIRETORIO_RELATORIOS = os.getenv('DIRETORIO_RELATORIOS', os.path.join(os.path.dirname(__file__), 'relatorios'))
+IS_VERCEL = os.getenv('VERCEL') == '1'
+BASE_DIR = os.path.dirname(__file__)
+DATA_DIR = '/tmp' if IS_VERCEL else BASE_DIR
+
+DIRETORIO_IMAGENS = os.getenv('DIRETORIO_IMAGENS', os.path.join(DATA_DIR, 'IMAGENS AWS'))
+DIRETORIO_RELATORIOS = os.getenv('DIRETORIO_RELATORIOS', os.path.join(DATA_DIR, 'relatorios'))
 ARQUIVO_TELEFONES_OVERRIDE = os.path.join(DIRETORIO_RELATORIOS, 'faturamento_telefones_overrides.json')
 ARQUIVO_REQUISICOES_PROCESSADAS = os.path.join(DIRETORIO_RELATORIOS, 'faturamento_requisicoes_processadas_manual.txt')
 # Lista de convenios para buscar (somente os 3 solicitados)
