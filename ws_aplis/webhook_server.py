@@ -69,7 +69,10 @@ async def _processar_guia(cod_requisicao: str, url_pdf: str, uuid_doc: str) -> d
 
     # 3. Anexar no APLIS
     client = get_client()
-    resultado = client.anexar_guia_assinada(cod_requisicao, pdf_bytes)
+    try:
+        resultado = client.anexar_guia_assinada(cod_requisicao, pdf_bytes)
+    except Exception as e:
+        resultado = {"sucesso": 0, "msgErro": f"Exceção ao chamar APLIS: {str(e)}"}
 
     if resultado.get("sucesso") == 1:
         db_local.atualizar_assinado(cod_requisicao, caminho_local)

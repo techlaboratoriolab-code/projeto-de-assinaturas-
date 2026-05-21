@@ -78,32 +78,24 @@ class AplisClient:
     def anexar_guia_assinada(self, cod_requisicao: str, pdf_bytes: bytes) -> dict:
         """
         Anexa o PDF da guia assinada à requisição via admissaoSalvar.
-
-        Quando codRequisicao já existe no APLIS, a requisição é atualizada
-        sem necessidade de re-enviar todos os campos obrigatórios.
-
-        Args:
-            cod_requisicao: Código da requisição (ex: 0040000356004)
-            pdf_bytes: Conteúdo do PDF em bytes
-
-        Returns:
-            dict com sucesso, codRequisicao, dtaPrevista, idEvento
         """
         pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
 
+        # Segundo a documentação, apenas codRequisicao e imagens são necessários para atualização.
+        # idLaboratorio é obrigatório na criação, mas vamos manter por segurança.
         dat = {
             "codRequisicao": cod_requisicao,
             "idLaboratorio": APLIS_ID_LABORATORIO,
             "imagens": [
                 {
-                    "tipo": APLIS_TIPO_IMAGEM_GUIA,
+                    "tipo": 5, # Alterado para 5 (Documento) conforme página 5 da documentação
                     "extensao": "PDF",
                     "arquivo": pdf_b64,
                 }
             ],
         }
 
-        print(f"📎 Anexando guia assinada à requisição {cod_requisicao}...")
+        print(f"📎 Anexando guia assinada à requisição {cod_requisicao} (Tipo 5)...")
         resultado = self._post("admissaoSalvar", dat)
         dat_resp = resultado.get("dat", {})
 
