@@ -65,8 +65,12 @@ IS_VERCEL = os.getenv('VERCEL') == '1'
 BASE_DIR = os.path.dirname(__file__)
 DATA_DIR = '/tmp' if IS_VERCEL else BASE_DIR
 
-DIRETORIO_IMAGENS = os.getenv('DIRETORIO_IMAGENS', os.path.join(DATA_DIR, 'IMAGENS AWS'))
-DIRETORIO_RELATORIOS = os.getenv('DIRETORIO_RELATORIOS', os.path.join(DATA_DIR, 'relatorios'))
+if IS_VERCEL:
+    DIRETORIO_IMAGENS = os.path.join('/tmp', 'IMAGENS AWS')
+    DIRETORIO_RELATORIOS = os.path.join('/tmp', 'relatorios')
+else:
+    DIRETORIO_IMAGENS = os.getenv('DIRETORIO_IMAGENS', os.path.join(DATA_DIR, 'IMAGENS AWS'))
+    DIRETORIO_RELATORIOS = os.getenv('DIRETORIO_RELATORIOS', os.path.join(DATA_DIR, 'relatorios'))
 ARQUIVO_TELEFONES_OVERRIDE = os.path.join(DIRETORIO_RELATORIOS, 'faturamento_telefones_overrides.json')
 ARQUIVO_REQUISICOES_PROCESSADAS = os.path.join(DIRETORIO_RELATORIOS, 'faturamento_requisicoes_processadas_manual.txt')
 # Lista de convenios para buscar (somente os 3 solicitados)
