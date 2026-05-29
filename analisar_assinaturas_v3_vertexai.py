@@ -71,8 +71,9 @@ if IS_VERCEL:
 else:
     DIRETORIO_IMAGENS = os.getenv('DIRETORIO_IMAGENS', os.path.join(DATA_DIR, 'IMAGENS AWS'))
     DIRETORIO_RELATORIOS = os.getenv('DIRETORIO_RELATORIOS', os.path.join(DATA_DIR, 'relatorios'))
+DIRETORIO_CSV = os.path.join(DIRETORIO_RELATORIOS, 'csv')
 ARQUIVO_TELEFONES_OVERRIDE = os.path.join(DIRETORIO_RELATORIOS, 'faturamento_telefones_overrides.json')
-ARQUIVO_REQUISICOES_PROCESSADAS = os.path.join(DIRETORIO_RELATORIOS, 'faturamento_requisicoes_processadas_manual.txt')
+ARQUIVO_REQUISICOES_PROCESSADAS = os.path.join(DIRETORIO_RELATORIOS, 'requisicoes', 'faturamento_requisicoes_processadas_manual.txt')
 # Lista de convenios para buscar (somente os 3 solicitados)
 CONVENIOS = [1000, 1001, 1091]
 TIPO_IMAGEM = int(os.getenv('TIPO_IMAGEM', 16))
@@ -450,10 +451,10 @@ Seu exame é prioridade para nós, mas dependemos dessa assinatura para dar cont
 def _registrar_log_wa(telefone_original, telefone_destino, status, mensagem='', erro=''):
     """Registra eventos de WhatsApp (envio e recebimento) em CSV diário."""
     try:
-        if not os.path.exists(DIRETORIO_RELATORIOS):
-            os.makedirs(DIRETORIO_RELATORIOS)
+        if not os.path.exists(DIRETORIO_CSV):
+            os.makedirs(DIRETORIO_CSV)
 
-        arquivo = os.path.join(DIRETORIO_RELATORIOS, f"whatsapp_enviadas_{datetime.now().strftime('%Y%m%d')}.csv")
+        arquivo = os.path.join(DIRETORIO_CSV, f"whatsapp_enviadas_{datetime.now().strftime('%Y%m%d')}.csv")
         existe = os.path.exists(arquivo)
         campos = ['DataHora', 'TelefoneOriginal', 'TelefoneDestino', 'ModoTeste', 'Status', 'Mensagem', 'Erro']
 
@@ -588,7 +589,7 @@ def enviar_resumo_diario_monitoramento(data_referencia=None):
         else:
             falhas_status += 1
 
-    log_dia = os.path.join(DIRETORIO_RELATORIOS, f"whatsapp_enviadas_{data_ref.strftime('%Y%m%d')}.csv")
+    log_dia = os.path.join(DIRETORIO_CSV, f"whatsapp_enviadas_{data_ref.strftime('%Y%m%d')}.csv")
     lembretes_enviados = 0
     telefones_invalidos = 0
     telefones_bloqueados = 0
@@ -630,9 +631,9 @@ def enviar_resumo_diario_monitoramento(data_referencia=None):
 
 def _iterar_logs_whatsapp():
     """Itera logs CSV de WhatsApp do mais novo para o mais antigo."""
-    if not os.path.exists(DIRETORIO_RELATORIOS):
+    if not os.path.exists(DIRETORIO_CSV):
         return
-    base = Path(DIRETORIO_RELATORIOS)
+    base = Path(DIRETORIO_CSV)
     arquivos = sorted(base.glob('whatsapp_enviadas_*.csv'), key=lambda p: p.stat().st_mtime, reverse=True)
     for arq in arquivos:
         try:
@@ -674,9 +675,8 @@ def _primeiro_nome_paciente(nome_completo):
     return nome.split()[0]
 
 def _normalizar_telefone_whatsapp(telefone):
-    """Normaliza telefone BR para o padrão de JID do WhatsApp:
-    - DDD <= 28 (SP/RJ/ES): Mantém ou adiciona o 9º dígito (13 dígitos com 55).
-    - DDD > 28 (Outros estados/DF): Remove o 9º dígito (12 dígitos com 55).
+    """Normaliza telefone BR para 55 + DDD + 9 dígitos (13 dígitos total).
+    Insere o 9º dígito em celulares no formato antigo (8 dígitos iniciando em 6-9).
     """
     tel = ''.join(ch for ch in str(telefone or '') if ch.isdigit())
     if not tel:
@@ -703,18 +703,13 @@ def _normalizar_telefone_whatsapp(telefone):
     if not ddd.isdigit() or int(ddd) < 11 or int(ddd) > 99:
         return None
 
-    ddd_int = int(ddd)
-    if ddd_int <= 28:
-        # SP, RJ, ES -> Exige 9 dígitos para celular
-        if len(numero_local) == 8 and numero_local[0] in '6789':
-            numero_local = '9' + numero_local
-    else:
-        # Outras regiões (incluindo DF/61) -> JID do WhatsApp usa 8 dígitos
-        if len(numero_local) == 9 and numero_local.startswith('9'):
-            numero_local = numero_local[1:]
+    # Celulares com 8 dígitos (formato antigo, antes da migração nacional para 9 dígitos).
+    # Fixos iniciam com 2-5 e NÃO recebem o 9.
+    if len(numero_local) == 8 and numero_local[0] in '6789':
+        numero_local = '9' + numero_local
 
-    # Evita números obviamente inválidos
-    if len(numero_local) == 8 and len(set(numero_local[-8:])) == 1:
+    # Evita números obviamente inválidos (sequência repetida no corpo principal).
+    if len(set(numero_local[-8:])) == 1:
         return None
 
     return f"55{ddd}{numero_local}"
@@ -827,10 +822,10 @@ def _confirmacao_enviada_recente(cod_req, telefone_limpo, janela_horas=24):
 
 def _iterar_csv_relatorios(pattern):
     """Itera linhas de arquivos CSV do diretório de relatórios do mais novo para o mais antigo."""
-    if not os.path.exists(DIRETORIO_RELATORIOS):
+    if not os.path.exists(DIRETORIO_CSV):
         return
 
-    base = Path(DIRETORIO_RELATORIOS)
+    base = Path(DIRETORIO_CSV)
     arquivos = sorted(base.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
     for arq in arquivos:
         try:
@@ -1116,8 +1111,14 @@ def enviar_documento_autentique_whatsapp(caminho_arquivo, cod_requisicao, nome_p
             telefone_limpo = ''.join(filter(str.isdigit, telefone))
             if telefone_limpo.startswith('55') and len(telefone_limpo) == 13:
                 telefone_autentique = f"+{telefone_limpo}"
+            elif telefone_limpo.startswith('55') and len(telefone_limpo) == 12:
+                # Número de 12 dígitos (55+DDD+8 dígitos): insere o 9 celular após DDI+DDD
+                telefone_autentique = f"+{telefone_limpo[:4]}9{telefone_limpo[4:]}"
             elif len(telefone_limpo) == 11:
                 telefone_autentique = f"+55{telefone_limpo}"
+            elif len(telefone_limpo) == 10:
+                # DDD+8 dígitos sem DDI: insere 55 e o 9 celular
+                telefone_autentique = f"+55{telefone_limpo[:2]}9{telefone_limpo[2:]}"
             else:
                 telefone_autentique = f"+{telefone_limpo}"
 
@@ -2092,8 +2093,9 @@ def gerar_relatorio_locais_origem_faturamento(requisicoes, info_periodo=None):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     arquivo_detalhado = f"relatorio_locais_origem_faturamento_{timestamp}.csv"
     arquivo_resumo = f"relatorio_locais_origem_faturamento_resumo_{timestamp}.csv"
-    caminho_detalhado = os.path.join(DIRETORIO_RELATORIOS, arquivo_detalhado)
-    caminho_resumo = os.path.join(DIRETORIO_RELATORIOS, arquivo_resumo)
+    os.makedirs(DIRETORIO_CSV, exist_ok=True)
+    caminho_detalhado = os.path.join(DIRETORIO_CSV, arquivo_detalhado)
+    caminho_resumo = os.path.join(DIRETORIO_CSV, arquivo_resumo)
 
     linhas_detalhadas = []
     for req in requisicoes or []:
@@ -2224,7 +2226,8 @@ def gerar_log_motivos(resultados, requisicoes=None):
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     arquivo = f"log_motivos_sem_assinatura_{timestamp}.csv"
-    caminho = os.path.join(DIRETORIO_RELATORIOS, arquivo)
+    os.makedirs(DIRETORIO_CSV, exist_ok=True)
+    caminho = os.path.join(DIRETORIO_CSV, arquivo)
 
     with open(caminho, 'w', newline='', encoding='utf-8') as f:
         campos = [
@@ -2266,12 +2269,11 @@ def salvar_csv_sem_telefone(sem_telefone):
     if not sem_telefone:
         return None
 
-    if not os.path.exists(DIRETORIO_RELATORIOS):
-        os.makedirs(DIRETORIO_RELATORIOS)
+    os.makedirs(DIRETORIO_CSV, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     arquivo = f"requisicoes_sem_telefone_{timestamp}.csv"
-    caminho = os.path.join(DIRETORIO_RELATORIOS, arquivo)
+    caminho = os.path.join(DIRETORIO_CSV, arquivo)
 
     linhas = []
     for item in sem_telefone:
@@ -2728,8 +2730,7 @@ def main():
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             arquivo_telefones = f"telefones_sem_assinatura_{timestamp}.csv"
 
-            if not os.path.exists(DIRETORIO_RELATORIOS):
-                os.makedirs(DIRETORIO_RELATORIOS)
+            os.makedirs(DIRETORIO_CSV, exist_ok=True)
 
             caminho = os.path.join(DIRETORIO_RELATORIOS, arquivo_telefones)
 
@@ -2909,7 +2910,8 @@ Pedimos desculpas pelo transtorno."""
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 arquivo_docs = f"documentos_autentique_producao_{timestamp}.csv"
 
-                caminho = os.path.join(DIRETORIO_RELATORIOS, arquivo_docs)
+                os.makedirs(DIRETORIO_CSV, exist_ok=True)
+                caminho = os.path.join(DIRETORIO_CSV, arquivo_docs)
 
                 with open(caminho, 'w', newline='', encoding='utf-8') as f:
                     campos = ['CodRequisicao', 'IdConvenio', 'DocumentoID', 'Telefone', 'NomPaciente', 'created_at']

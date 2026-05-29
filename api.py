@@ -48,6 +48,7 @@ PYTHON     = sys.executable if IS_VERCEL else (BASE_DIR / ".venv" / "Scripts" / 
 
 CONFIG_F   = DATA_DIR / "config.json"
 RELATORIOS_DIR = DATA_DIR / "relatorios"
+CSV_DIR = RELATORIOS_DIR / "csv"
 IMAGENS_DIR = Path(os.getenv("DIRETORIO_IMAGENS", str(DATA_DIR / "IMAGENS AWS")))
 FATURAMENTO_FILE = BASE_DIR / "docs" / "requisicoes_faturamento.txt"
 
@@ -255,8 +256,8 @@ def _save_config(cfg: dict):
 
 def _append_whatsapp_log_row(status: str, mensagem: str, telefone_original: str, telefone_destino: str, erro: str = ""):
     try:
-        RELATORIOS_DIR.mkdir(parents=True, exist_ok=True)
-        arquivo = RELATORIOS_DIR / f"whatsapp_enviadas_{date.today().strftime('%Y%m%d')}.csv"
+        CSV_DIR.mkdir(parents=True, exist_ok=True)
+        arquivo = CSV_DIR / f"whatsapp_enviadas_{date.today().strftime('%Y%m%d')}.csv"
         existe = arquivo.exists()
         campos = ["DataHora", "TelefoneOriginal", "TelefoneDestino", "ModoTeste", "Status", "Mensagem", "Erro"]
         with arquivo.open("a", encoding="utf-8", newline="") as f:
@@ -713,9 +714,9 @@ def _terminate_process_tree(proc: subprocess.Popen):
             pass
 
 def _iter_recent_whatsapp_rows(max_rows: int = 8000):
-    if not RELATORIOS_DIR.exists():
+    if not CSV_DIR.exists():
         return []
-    files = sorted(RELATORIOS_DIR.glob("whatsapp_enviadas_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+    files = sorted(CSV_DIR.glob("whatsapp_enviadas_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
     rows = []
     for path in files:
         try:
@@ -1204,7 +1205,8 @@ def run_faturamento_individual(body: FaturamentoRunIndividualIn):
         env["FATURAMENTO_PERMITIR_REENVIO"] = "true"
 
     RELATORIOS_DIR.mkdir(parents=True, exist_ok=True)
-    alvo_file = RELATORIOS_DIR / f"requisicao_faturamento_individual_{req}.txt"
+    (RELATORIOS_DIR / "requisicoes").mkdir(exist_ok=True)
+    alvo_file = RELATORIOS_DIR / "requisicoes" / f"requisicao_faturamento_individual_{req}.txt"
     alvo_file.write_text(f"{req}\n", encoding="utf-8")
 
     _log_buffer = []
@@ -1581,9 +1583,9 @@ def _load_faturamento_requisicoes():
     return items
 
 def _load_whatsapp_rows(limit: int = 5000):
-    if not RELATORIOS_DIR.exists():
+    if not CSV_DIR.exists():
         return []
-    files = sorted(RELATORIOS_DIR.glob("whatsapp_enviadas_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+    files = sorted(CSV_DIR.glob("whatsapp_enviadas_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
     all_rows = []
     for path in files:
         try:
@@ -2216,9 +2218,9 @@ def autentique_delete_by_requisicao(body: AutentiqueDeleteByRequisicaoIn):
     return resp
 
 def _get_latest_file(pattern: str) -> Path | None:
-    if not RELATORIOS_DIR.exists():
+    if not CSV_DIR.exists():
         return None
-    files = sorted(RELATORIOS_DIR.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
+    files = sorted(CSV_DIR.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
     return files[0] if files else None
 
 @app.get("/api/requisicoes/{requisicao}/imagens")
