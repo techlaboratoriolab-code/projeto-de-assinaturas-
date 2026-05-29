@@ -674,8 +674,9 @@ def _primeiro_nome_paciente(nome_completo):
     return nome.split()[0]
 
 def _normalizar_telefone_whatsapp(telefone):
-    """Normaliza telefone BR para WhatsApp (55 + DDD + 9 dígitos).
-    Insere o 9º dígito em números celulares no formato antigo (8 dígitos, iniciando em 6-9).
+    """Normaliza telefone BR para o padrão de JID do WhatsApp:
+    - DDD <= 28 (SP/RJ/ES): Mantém ou adiciona o 9º dígito (13 dígitos com 55).
+    - DDD > 28 (Outros estados/DF): Remove o 9º dígito (12 dígitos com 55).
     """
     tel = ''.join(ch for ch in str(telefone or '') if ch.isdigit())
     if not tel:
@@ -702,17 +703,21 @@ def _normalizar_telefone_whatsapp(telefone):
     if not ddd.isdigit() or int(ddd) < 11 or int(ddd) > 99:
         return None
 
-    # Números celulares com 8 dígitos (formato antigo, antes da migração para 9 dígitos).
-    # Celulares iniciam com 6, 7, 8 ou 9. Fixos iniciam com 2, 3, 4 ou 5 e NÃO recebem o 9.
-    if len(numero_local) == 8 and numero_local[0] in '6789':
-        numero_local = '9' + numero_local
-        nacional = ddd + numero_local
+    ddd_int = int(ddd)
+    if ddd_int <= 28:
+        # SP, RJ, ES -> Exige 9 dígitos para celular
+        if len(numero_local) == 8 and numero_local[0] in '6789':
+            numero_local = '9' + numero_local
+    else:
+        # Outras regiões (incluindo DF/61) -> JID do WhatsApp usa 8 dígitos
+        if len(numero_local) == 9 and numero_local.startswith('9'):
+            numero_local = numero_local[1:]
 
-    # Evita números obviamente inválidos (sequência repetida no corpo principal).
-    if len(set(numero_local[-8:])) == 1:
+    # Evita números obviamente inválidos
+    if len(numero_local) == 8 and len(set(numero_local[-8:])) == 1:
         return None
 
-    return f"55{nacional}"
+    return f"55{ddd}{numero_local}"
 
 def _carregar_telefones_bloqueados_env():
     """Carrega lista de telefones bloqueados para envio (separados por virgula)."""

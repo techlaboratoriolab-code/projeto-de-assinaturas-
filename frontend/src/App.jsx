@@ -367,7 +367,7 @@ const guiaStatus = {
   analisando:{ color: '#a78bfa', label: 'Analisando…' },
 }
 
-function GuiasGrid({ guias, iaTotal }) {
+function GuiasGrid({ guias, iaTotal, onEnviarIndividual, enviandoReq, running }) {
   const [limit, setLimit] = useState(24)
   useEffect(() => { setLimit(24) }, [iaTotal])
   if (!guias.length) return null
@@ -381,13 +381,41 @@ function GuiasGrid({ guias, iaTotal }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 4 }}>
         {exibidas.map(g => {
           const s = guiaStatus[g.status] || { color: TX3, label: 'Indefinido' }
+          const isPendente = g.status === 'pendente'
+          const isEnviando = enviandoReq === g.cod
           return (
-            <div key={g.cod} style={{ background: SURF2, border: `0.5px solid ${BDR}`, borderRadius: 7, padding: '8px 10px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontFamily: 'monospace', fontSize: 10.5, color: '#818cf8' }}>{g.cod}</span>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+            <div key={g.cod} style={{ background: SURF2, border: `0.5px solid ${BDR}`, borderRadius: 7, padding: '8px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: isPendente && onEnviarIndividual ? 82 : 62 }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: 10.5, color: '#818cf8' }}>{g.cod}</span>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                </div>
+                <span style={{ fontSize: 10, color: s.color }}>{s.label}</span>
               </div>
-              <span style={{ fontSize: 10, color: s.color }}>{s.label}</span>
+              {isPendente && onEnviarIndividual && (
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onEnviarIndividual(g.cod) }}
+                    disabled={running || !!enviandoReq}
+                    style={{
+                      width: '100%',
+                      background: '#2563eb',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 4,
+                      padding: '3px 6px',
+                      fontSize: 9,
+                      fontWeight: 500,
+                      cursor: (running || enviandoReq) ? 'not-allowed' : 'pointer',
+                      opacity: (running || enviandoReq) ? 0.6 : 1,
+                      transition: 'all 0.1s',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {isEnviando ? 'Enviando…' : 'Enviar assinatura'}
+                  </button>
+                </div>
+              )}
             </div>
           )
         })}
@@ -402,7 +430,7 @@ function GuiasGrid({ guias, iaTotal }) {
 }
 
 // ── Dashboard (progresso em tempo real) ──────────────────────────────────────
-function Dashboard({ running, logs, done, executionSnapshot }) {
+function Dashboard({ running, logs, done, executionSnapshot, onEnviarIndividual, enviandoReq }) {
   const d = parseDashboard(logs)
   const snap = executionSnapshot || {}
   if (running && snap?.running) {
@@ -526,7 +554,7 @@ function Dashboard({ running, logs, done, executionSnapshot }) {
 
       {d.guias.length > 0 && (
         <Card pad>
-          <GuiasGrid guias={d.guias} iaTotal={d.iaTotal} />
+          <GuiasGrid guias={d.guias} iaTotal={d.iaTotal} onEnviarIndividual={onEnviarIndividual} enviandoReq={enviandoReq} running={running} />
         </Card>
       )}
     </div>
@@ -1370,6 +1398,7 @@ export default function App() {
   const [aba, setAba]           = useState(() => { try { return localStorage.getItem('aba_ativa') || 'analise' } catch { return 'analise' } })
   const [dataInicial, setDataInicial] = useState(formatDateLocal(new Date()))
   const [dataFinal,   setDataFinal]   = useState(formatDateLocal(new Date()))
+  const [requisicoesEspecificas, setRequisicoesEspecificas] = useState('')
   const [modoTeste,   setModoTeste]   = useState(false)
   const [tarefaAplis, setTarefaAplis] = useState(false)
   const [running,     setRunning]     = useState(false)
@@ -1384,6 +1413,7 @@ export default function App() {
   const [runContext,  setRunContext]   = useState(() => { try { const raw = localStorage.getItem('run_context_v1'); return raw ? JSON.parse(raw) : { mode: null, startedAt: null, finishedAt: null } } catch { return { mode: null, startedAt: null, finishedAt: null } } })
   const [execSnap,    setExecSnap]    = useState(null)
   const [gerDiario,   setGerDiario]   = useState({ summary: null, records: [] })
+  const [enviandoReq, setEnviandoReq] = useState('')
 
   const esRef   = useRef(null)
   const pinnedR = useRef(true)
@@ -1494,12 +1524,33 @@ export default function App() {
   const handleRun = useCallback(async () => {
     setError(null); setLogs([]); setTotalLines(0); setPinned(true); setShowLog(false)
     try {
-      const r = await fetch(`${API}/api/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data_inicial: dataInicial, data_final: dataFinal }) })
+      const r = await fetch(`${API}/api/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data_inicial: dataInicial, data_final: dataFinal, requisicoes: requisicoesEspecificas }) })
       const d = await r.json()
       if (d.error) { setError(d.error); return }
       setRunning(true); setRunContext({ mode: 'analise', startedAt: new Date().toISOString(), finishedAt: null })
     } catch { setError('Não foi possível conectar ao backend'); return }
     startStream({ reset: true, keepPinned: true })
+  }, [dataInicial, dataFinal, requisicoesEspecificas, startStream])
+
+  const enviarIndividual = useCallback(async (req) => {
+    setError(null); setEnviandoReq(req)
+    try {
+      const r = await fetch(`${API}/api/faturamento/run-individual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requisicao: req,
+          data_inicial: dataInicial || null,
+          data_final: dataFinal || null
+        })
+      })
+      const d = await r.json()
+      if (!r.ok || d.error) { setError(d.error || 'Falha'); return }
+      setRunning(true)
+      setRunContext({ mode: 'faturamento', startedAt: new Date().toISOString(), finishedAt: null })
+      startStream({ reset: true, keepPinned: true })
+    } catch { setError('Falha ao enviar individual') }
+    finally { setEnviandoReq('') }
   }, [dataInicial, dataFinal, startStream])
 
   const handleStop = useCallback(async (opts = {}) => {
@@ -1585,6 +1636,18 @@ export default function App() {
             <Input type="date" value={dataInicial} onChange={e => setDataInicial(e.target.value)} disabled={running} />
             <span style={{ fontSize: 11, color: TX3 }}>→</span>
             <Input type="date" value={dataFinal}   onChange={e => setDataFinal(e.target.value)}   disabled={running} />
+            
+            <div style={{ width: 1, height: 16, background: BDR, margin: '0 8px' }} />
+            
+            <span style={{ fontSize: 11, color: TX3 }}>Ou guias específicas</span>
+            <Input
+              value={requisicoesEspecificas}
+              onChange={e => setRequisicoesEspecificas(e.target.value)}
+              placeholder="Ex: 2605202612345, 2605202612346..."
+              disabled={running}
+              style={{ width: 340 }}
+            />
+            
             <div style={{ flex: 1 }} />
             {error && <span style={{ color: '#f87171', fontSize: 12 }}>{error}</span>}
             <Btn onClick={handleExportSemTel}>Baixar pacientes sem telefone</Btn>
@@ -1606,7 +1669,16 @@ export default function App() {
           <ExecHistory ger={gerDiario} title="Histórico de Execuções — Análise Diária" />
 
           {/* Dashboard em tempo real */}
-          {running && <Dashboard running={running} logs={logs} done={false} executionSnapshot={execSnap} />}
+          {(running || logs.length > 0) && (
+            <Dashboard
+              running={running}
+              logs={logs}
+              done={!running && logs.length > 0}
+              executionSnapshot={execSnap}
+              onEnviarIndividual={enviarIndividual}
+              enviandoReq={enviandoReq}
+            />
+          )}
 
           {/* Log colapsável */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

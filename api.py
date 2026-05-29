@@ -736,6 +736,7 @@ class RunIn(BaseModel):
     data: date | None = None
     data_inicial: date | None = None
     data_final: date | None = None
+    requisicoes: str | None = None
 
 class FaturamentoRunIn(BaseModel):
     data_inicial: date | None = None
@@ -843,20 +844,7 @@ def run_analysis(body: RunIn):
         return {"error": "Já está executando. Aguarde ou clique em Parar."}
 
     cfg = _load_config()
-    if body.data_inicial and body.data_final:
-        data_ini_date = body.data_inicial
-        data_fim_date = body.data_final
-    elif body.data:
-        data_ini_date = body.data
-        data_fim_date = body.data
-    else:
-        return {"error": "Informe data única ou período (data_inicial e data_final)."}
-
-    if data_ini_date > data_fim_date:
-        return {"error": "data_inicial não pode ser maior que data_final."}
-
-    data_ini = data_ini_date.isoformat()
-    data_fim = data_fim_date.isoformat()
+    requisicoes_raw = (body.requisicoes or "").strip()
 
     env = os.environ.copy()
     env["MODO_TESTE"] = "true" if cfg.get("modo_teste", True) else "false"
@@ -871,6 +859,141 @@ def run_analysis(body: RunIn):
             _log_queue.get_nowait()
         except queue.Empty:
             break
+
+    if requisicoes_raw:
+        # Extrai todas as sequências de 13 dígitos
+        import re
+        req_list = re.findall(r"\d{13}", requisicoes_raw)
+        if not req_list:
+            return {"error": "Nenhuma requisição de 13 dígitos válida foi encontrada."}
+        
+        # Cria arquivo temporário com as requisições
+        temp_f = tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w", encoding="utf-8")
+        for req in req_list:
+            temp_f.write(f"{req}\n")
+        temp_f.close()
+
+        _set_current_run("diario", {
+            "started_at": datetime.now().isoformat(timespec="seconds"),
+            "data_inicial": "",
+            "data_final": "",
+        })
+
+        if IS_VERCEL:
+            # No Vercel/inline
+            proc_handle = _InlineProcessHandle()
+            _process = proc_handle
+            
+            def _run_inline_with_file():
+                old_argv = list(sys.argv)
+                env_marker = object()
+                old_env = {}
+                writer = _QueuedLogWriter(_push_daily_log_line)
+                return_code = 1
+                try:
+                    for key, value in env.items():
+                        old_env[key] = os.environ.get(key, env_marker)
+                        os.environ[key] = value
+
+                    sys.argv = [str(SCRIPT), "--somente-requisicoes-arquivo", temp_f.name, "--ignorar-periodo-quando-lista"]
+                    with contextlib.redirect_stdout(writer), contextlib.redirect_stderr(writer):
+                        module = sys.modules.get("analisar_assinaturas_v3_vertexai")
+                        if module is None:
+                            module = importlib.import_module("analisar_assinaturas_v3_vertexai")
+                        else:
+                            module = importlib.reload(module)
+                        result = module.main()
+                        return_code = int(result) if isinstance(result, int) else 0
+                except SystemExit as exc:
+                    code = exc.code
+                    return_code = code if isinstance(code, int) else 0
+                except Exception:
+                    traceback.print_exc(file=writer)
+                    return_code = 1
+                finally:
+                    writer.flush()
+                    sys.argv = old_argv
+                    for key, old_value in old_env.items():
+                        if old_value is env_marker:
+                            os.environ.pop(key, None)
+                        else:
+                            os.environ[key] = old_value
+
+                    proc_handle.set_return_code(return_code)
+                    status = _classify_daily_run_status(return_code, list(_log_buffer))
+                    if return_code != 0:
+                        _push_daily_log_line(f"ERRO: O processo diário terminou com código {return_code}")
+                    _record_current_run_if_needed(status, logs=list(_log_buffer))
+                    _log_queue.put("__DONE__")
+                    try:
+                        os.remove(temp_f.name)
+                    except Exception:
+                        pass
+
+            worker = threading.Thread(target=_run_inline_with_file, daemon=True)
+            proc_handle.attach(worker)
+            worker.start()
+            return {"ok": True, "requisicoes": len(req_list)}
+
+        _process = subprocess.Popen(
+            [
+                str(PYTHON), "-u", str(SCRIPT),
+                "--somente-requisicoes-arquivo", str(temp_f.name),
+                "--ignorar-periodo-quando-lista",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            env=env,
+            cwd=str(BASE_DIR),
+            encoding="utf-8",
+            errors="replace",
+        )
+
+        def _reader_with_cleanup():
+            try:
+                for line in _process.stdout:
+                    stripped = line.rstrip()
+                    _log_buffer.append(stripped)
+                    _log_queue.put(stripped)
+                
+                return_code = _process.wait()
+                status = _classify_daily_run_status(return_code, list(_log_buffer))
+                if return_code != 0:
+                    err_msg = f"ERRO: O processo diário terminou com código {return_code}"
+                    _log_buffer.append(err_msg)
+                    _log_queue.put(err_msg)
+                _record_current_run_if_needed(status, logs=list(_log_buffer))
+            except Exception as e:
+                err_msg = f"ERRO na thread de log diário: {str(e)}"
+                _log_buffer.append(err_msg)
+                _log_queue.put(err_msg)
+                _record_current_run_if_needed("erro", logs=list(_log_buffer))
+            finally:
+                _log_queue.put("__DONE__")
+                try:
+                    os.remove(temp_f.name)
+                except Exception:
+                    pass
+
+        threading.Thread(target=_reader_with_cleanup, daemon=True).start()
+        return {"ok": True, "requisicoes": len(req_list)}
+
+    if body.data_inicial and body.data_final:
+        data_ini_date = body.data_inicial
+        data_fim_date = body.data_final
+    elif body.data:
+        data_ini_date = body.data
+        data_fim_date = body.data
+    else:
+        return {"error": "Informe data única, período ou requisições específicas."}
+
+    if data_ini_date > data_fim_date:
+        return {"error": "data_inicial não pode ser maior que data_final."}
+
+    data_ini = data_ini_date.isoformat()
+    data_fim = data_fim_date.isoformat()
 
     _set_current_run("diario", {
         "started_at": datetime.now().isoformat(timespec="seconds"),
@@ -1060,9 +1183,10 @@ def run_faturamento_individual(body: FaturamentoRunIndividualIn):
     if body.data_inicial and body.data_final and body.data_inicial > body.data_final:
         return {"error": "data_inicial não pode ser maior que data_final."}
 
+    # Permite enviar qualquer guia individualmente, mesmo fora da lista de faturamento se vinda da análise
     watch = _load_faturamento_requisicoes()
-    if watch and req not in {w.get("requisicao") for w in watch}:
-        return {"error": "Requisição não encontrada na lista de faturamento."}
+    # if watch and req not in {w.get("requisicao") for w in watch}:
+    #     return {"error": "Requisição não encontrada na lista de faturamento."}
 
     cfg = _load_config()
     data_ini = body.data_inicial.isoformat() if body.data_inicial else ""
