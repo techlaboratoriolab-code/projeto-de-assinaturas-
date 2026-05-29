@@ -5,8 +5,14 @@ import os
 import time
 import csv
 import argparse
+from pathlib import Path
+from dotenv import load_dotenv
 import google.generativeai as genai
 from PIL import Image
+
+_script_dir = Path(__file__).resolve().parent
+load_dotenv(_script_dir.parent / '.env', override=False)
+load_dotenv(_script_dir / '.env', override=False)
 try:
     import fitz  # PyMuPDF para converter PDF em imagem
     PYMUPDF_OK = True
@@ -20,12 +26,12 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 
 # Configurações de conexão com o banco de dados
-# Substitua 'nome_do_banco' pelo nome real do seu banco de dados
 DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': 'SENHA@ROOT',
-    'database': 'bancodedados'  # <--- ATENÇÃO: PREENCHER AQUI
+    'host': os.getenv('DB_HOST', 'localhost'),
+    'port': int(os.getenv('DB_PORT', '3306')),
+    'user': os.getenv('DB_USER', 'root'),
+    'password': os.getenv('DB_PASSWORD', ''),
+    'database': os.getenv('DB_NAME', 'lab')
 }
 
 # Filtros fixos solicitados: somente registros do convenio 1040 e arquivos PDF
@@ -36,16 +42,11 @@ FILTRAR_APENAS_PDF = False
 # Se verdadeiro, converterá PDFs (primeira página) para imagem temporária e enviará ao Gemini.
 ANALISAR_PDF = False
 
-# Configuração do Gemini usando Service Account
-# Caminho para o arquivo JSON de credenciais
-GOOGLE_CREDENTIALS_PATH = r"C:\Users\Windows 11\Desktop\spry-catcher-449921-h8-bbc989e73ec4.json"
-
-# Configura as credenciais do Google Cloud
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = GOOGLE_CREDENTIALS_PATH
+# GOOGLE_APPLICATION_CREDENTIALS carregado pelo dotenv
 genai.configure()
 
 # Diretório onde as imagens serão baixadas e salvas
-DIRETORIO_IMAGENS = r"C:\Users\Windows 11\Desktop\imagemAWS"
+DIRETORIO_IMAGENS = os.getenv('DIRETORIO_IMAGENS', str(_script_dir.parent / 'imagens_aws'))
 
 # URLs da AWS para download
 URLS_AWS = {
@@ -63,12 +64,12 @@ URLS_AWS = {
     "0049": "https://sa-east-1.console.aws.amazon.com/s3/buckets/aplis2?region=sa-east-1&bucketType=general&prefix=lab/Arquivos/Foto/0049/&showversions=false"
 }
 
-# Credenciais AWS
+# Credenciais AWS Console (login Selenium)
 AWS_LOGIN = {
-    'account': '758835577866',
-    'username': 'lab',
-    'password': 'NtH[&9&bdF!B@1='
-} 
+    'account': os.getenv('AWS_ACCOUNT_ID', '758835577866'),
+    'username': os.getenv('AWS_IAM_USER', 'lab'),
+    'password': os.getenv('AWS_IAM_PASSWORD', '')
+}
 
 def setup_chrome_download_preferences(download_dir: str) -> webdriver.ChromeOptions:
     """Configura o Chrome para downloads automáticos"""

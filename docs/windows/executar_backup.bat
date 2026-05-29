@@ -17,7 +17,7 @@ set "UMAMI_WEBSITE_ID=d10aa39d-ed40-4a69-8810-7fe9668d7eea"
 set "UMAMI_HOSTNAME=waha-backup-diario.local"
 set "UMAMI_EVENT_URL=/backup-whatsapp"
 
-"%~dp0..\.venv\Scripts\python.exe" "%~dp0backup_Por_data.py" --modo automatico
+"%~dp0..\..\venv\Scripts\python.exe" "%~dp0..\backup_Por_data.py" --modo automatico
 
 echo.
 echo ========================================

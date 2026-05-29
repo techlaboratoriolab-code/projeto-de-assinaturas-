@@ -14,19 +14,13 @@ _script_dir = Path(__file__).resolve().parent
 load_dotenv(_script_dir.parent / '.env', override=False)
 load_dotenv(_script_dir / '.env', override=False)
 # --- CONFIGURAÇÕES ---
-WAHA_API_URL = "https://waha.ngrok.dev"
-WAHA_API_KEY = "laboratorio-lab"  # Adicione aqui se necessário (deixe vazio se não usar)
-SESSION_NAME = "atendimento"
+WAHA_API_URL = os.getenv('WAHA_URL', 'https://waha.ngrok.dev')
+WAHA_API_KEY = os.getenv('WAHA_API_KEY', 'laboratorio-lab')
+SESSION_NAME = os.getenv('WAHA_SESSION', 'atendimento')
 MEU_NOME = "Eu (atendimento)"
-# Usamos 'r' antes da string para que o Python leia o caminho do Windows corretamente.
-# Pasta de saída apenas para o arquivo CSV de histórico.
-PASTA_SAIDA = r"G:\Meu Drive\Histórico WhatsApp\historicos_diarios"
-# Pasta para salvar arquivos de mídia baixados
-PASTA_MIDIA = r"G:\Meu Drive\Histórico WhatsApp\midias"
-# Configuração do Google Generative AI (Gemini)
-GOOGLE_CREDENTIALS_PATH = r"C:\Users\Windows 11\Desktop\analisar dor de assinatuas de guias\spry-catcher-449921-h8-bbc989e73ec4.json"
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = GOOGLE_CREDENTIALS_PATH
-# Configurar a API do Gemini
+PASTA_SAIDA = os.getenv('PASTA_HISTORICOS_WHATSAPP', str(_script_dir.parent / 'historicos_whatsapp'))
+PASTA_MIDIA = os.getenv('PASTA_MIDIA_WHATSAPP', str(_script_dir.parent / 'midia_whatsapp'))
+# GOOGLE_APPLICATION_CREDENTIALS carregado pelo dotenv
 try:
     genai.configure()
     print("✓ Google Generative AI configurado com sucesso")

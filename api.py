@@ -44,7 +44,7 @@ BASE_DIR   = Path(__file__).parent
 DATA_DIR   = Path("/tmp") if IS_VERCEL else BASE_DIR
 
 SCRIPT     = BASE_DIR / "analisar_assinaturas_v3_vertexai.py"
-PYTHON     = sys.executable if IS_VERCEL else (BASE_DIR / ".venv" / "Scripts" / "python.exe" if os.name == "nt" else "python3")
+PYTHON     = sys.executable if IS_VERCEL else (BASE_DIR / ".venv" / "Scripts" / "python.exe" if os.name == "nt" else sys.executable)
 
 CONFIG_F   = DATA_DIR / "config.json"
 RELATORIOS_DIR = DATA_DIR / "relatorios"

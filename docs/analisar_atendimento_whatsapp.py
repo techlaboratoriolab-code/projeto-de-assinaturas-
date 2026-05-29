@@ -25,9 +25,13 @@ try:
 except ImportError:
     # Fallback para configurações padrão se arquivo não existir
     print("⚠ Arquivo config_analise.py não encontrado. Usando configurações padrão.")
-    GOOGLE_CREDENTIALS_PATH = r"C:\Users\Windows 11\Desktop\spry-catcher-449921-h8-bbc989e73ec4.json"
-    PASTA_HISTORICOS = r"G:\Meu Drive\Histórico WhatsApp\historicos_diarios"
-    PASTA_RELATORIOS = r"G:\Meu Drive\Histórico WhatsApp\historicos_diarios\Análises do gemini"
+    from pathlib import Path as _Path
+    from dotenv import load_dotenv as _load_dotenv
+    _sd = _Path(__file__).resolve().parent
+    _load_dotenv(_sd.parent / '.env', override=False)
+    GOOGLE_CREDENTIALS_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', '')
+    PASTA_HISTORICOS = os.getenv('PASTA_HISTORICOS_WHATSAPP', str(_sd.parent / 'historicos_whatsapp'))
+    PASTA_RELATORIOS = os.getenv('PASTA_RELATORIOS_WHATSAPP', '')
     MODELO_GEMINI = 'models/gemini-2.5-flash'
     GERAR_JSON = True
     GERAR_TXT = True

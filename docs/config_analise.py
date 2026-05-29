@@ -6,14 +6,20 @@ Modifique este arquivo ao invés de alterar o código principal.
 """
 
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+_script_dir = Path(__file__).resolve().parent
+load_dotenv(_script_dir.parent / '.env', override=False)
+load_dotenv(_script_dir / '.env', override=False)
 
 # ==================== CREDENCIAIS ====================
 # Caminho para o arquivo de credenciais do Google Cloud
-GOOGLE_CREDENTIALS_PATH = r"C:\Users\Windows 11\Desktop\spry-catcher-449921-h8-bbc989e73ec4.json"
+GOOGLE_CREDENTIALS_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', '')
 
 # ==================== PASTAS ====================
 # Pasta onde estão os CSVs de backup do WhatsApp
-PASTA_HISTORICOS = r"G:\Meu Drive\Histórico WhatsApp\historicos_diarios"
+PASTA_HISTORICOS = os.getenv('PASTA_HISTORICOS_WHATSAPP', str(_script_dir.parent / 'historicos_whatsapp'))
 
 # Pasta onde os relatórios de análise serão salvos
 # Se vazio, será criada subpasta "analises" dentro de PASTA_HISTORICOS

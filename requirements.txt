@@ -21,10 +21,10 @@ google-generativeai==0.3.2
 google-cloud-aiplatform>=1.71.1
 
 # Manipulação de Imagens
-Pillow==10.1.0
+Pillow>=10.4.0
 
 # Conversão de PDF
-PyMuPDF==1.26.6
+PyMuPDF>=1.24.0
 
 # Automacao navegador APLIS
 selenium>=4.25.0
